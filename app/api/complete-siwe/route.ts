@@ -23,65 +23,38 @@ interface IRequestPayload {
   appId: string;
 }
 
-export async function POST(req: NextRequest) {
-  // Set app ID from environment variable or use default
-  const appId = process.env.WORLD_APP_ID || "app_a694eef5223a11d38b4f737fad00e561"
-  
+export async function POST(request: NextRequest) {
   try {
-    const { payload, nonce } = (await req.json()) as IRequestPayload
-    console.log("Received verification request:", { payload, nonce })
+    // Parse the request body
+    const body = await request.json();
+    const { payload, nonce, appId } = body;
     
-    // Get the stored nonce from cookies
-    const storedNonce = req.cookies.get("siwe")?.value
-    console.log("Stored nonce:", storedNonce)
-    
-    if (nonce !== storedNonce) {
-      console.error("Invalid nonce:", { provided: nonce, stored: storedNonce })
-      return NextResponse.json({
-        status: "error",
-        isValid: false,
-        message: "Invalid nonce",
-      })
+    // In a real implementation, you would verify the SIWE message and signature
+    // For this demo, we'll just validate that we received the required fields
+    if (!payload || !nonce || !appId) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
     }
     
-    try {
-      // Use mock verification for now
-      const validMessage = await mockVerifySiweMessage(payload, nonce)
-      console.log("Verification result:", validMessage)
-      
-      if (validMessage.isValid) {
-        // Create response with success result
-        const response = NextResponse.json({
-          status: "success",
-          isValid: true,
-          address: payload.address
-        })
-        
-        // Clear the nonce cookie as it's no longer needed
-        response.cookies.delete("siwe")
-        
-        return response
-      } else {
-        return NextResponse.json({
-          status: "error",
-          isValid: false,
-          message: "Invalid signature",
-        })
-      }
-    } catch (error: any) {
-      console.error("Verification error:", error)
-      return NextResponse.json({
-        status: "error",
-        isValid: false,
-        message: error.message || "Verification failed",
-      })
-    }
-  } catch (error: any) {
-    console.error("Request processing error:", error)
+    // Log the verification attempt
+    console.log('SIWE verification attempt:', {
+      address: payload.address,
+      nonce,
+      appId,
+    });
+    
+    // For demo purposes, always return success
     return NextResponse.json({
-      status: "error",
-      isValid: false,
-      message: "Invalid request format",
-    })
+      isValid: true,
+      address: payload.address,
+    });
+  } catch (error) {
+    console.error('Error verifying SIWE payload:', error);
+    return NextResponse.json(
+      { error: 'Failed to verify authentication' },
+      { status: 500 }
+    );
   }
 } 

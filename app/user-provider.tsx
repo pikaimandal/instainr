@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
-import { getUser, setUser as storeUser, User } from "@/lib/store"
+import { getUser, setUser as storeUser, User } from "../lib/store"
 
 // Define the context shape
 interface UserContextType {

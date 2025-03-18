@@ -3,16 +3,16 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { z } from "zod"
-import type {} from "@/lib/minikit" // Import types without importing any actual code
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
+import type {} from "../lib/minikit" // Import types without importing any actual code
+import { Button } from "../components/ui/button"
+import { useToast } from "../components/ui/use-toast"
 import { Loader2 } from "lucide-react"
-import { getUser, setUser } from "@/lib/store"
-import { useUserContext } from "@/app/user-provider"
+import { getUser, setUser } from "../lib/store"
+import { useUserContext } from "../app/user-provider"
 import { useRouter } from "next/navigation"
 import { IDKitWidget, VerificationLevel } from "@worldcoin/idkit"
-import { verifyWorldId, mockSiweVerify } from "@/lib/actions"
-import { useMiniKitPolling, detectWorldApp } from "@/lib/minikit"
+import { verifyWorldId, mockSiweVerify } from "../lib/actions"
+import { useMiniKitPolling, detectWorldApp } from "../lib/minikit"
 
 interface AuthScreenProps {
   onAuthenticated: (userData: {
@@ -321,6 +321,22 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       // Detect World App environment
       const isWorldApp = await detectWorldAppEnv()
       
+      // Define captureDebugInfo function
+      const captureDebugInfo = () => {
+        const info: Record<string, any> = {
+          isInIframe: typeof window !== 'undefined' ? window !== window.parent : 'SSR',
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'SSR',
+          hasMiniKit: typeof window !== 'undefined' ? !!window.MiniKit : 'SSR',
+          miniKitVersion: typeof window !== 'undefined' && window.MiniKit && 'version' in window.MiniKit ? window.MiniKit.version : 'unknown',
+          windowKeys: typeof window !== 'undefined' ? Object.keys(window).filter(k => k.toLowerCase().includes('world') || k.toLowerCase().includes('mini')) : [],
+          documentReady: typeof document !== 'undefined' ? document.readyState : 'SSR',
+        };
+        
+        setDebugInfo(info);
+        console.log("Debug info:", info);
+        return info;
+      };
+      
       // Capture debug info
       const debugData = captureDebugInfo()
       console.log("Debug info:", debugData)
@@ -341,6 +357,22 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       setIsLoading(false)
     }
   }
+
+  // Define captureDebugInfo function at component level
+  const captureDebugInfo = () => {
+    const info: Record<string, any> = {
+      isInIframe: typeof window !== 'undefined' ? window !== window.parent : 'SSR',
+      userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'SSR',
+      hasMiniKit: typeof window !== 'undefined' ? !!window.MiniKit : 'SSR',
+      miniKitVersion: typeof window !== 'undefined' && window.MiniKit && 'version' in window.MiniKit ? window.MiniKit.version : 'unknown',
+      windowKeys: typeof window !== 'undefined' ? Object.keys(window).filter(k => k.toLowerCase().includes('world') || k.toLowerCase().includes('mini')) : [],
+      documentReady: typeof document !== 'undefined' ? document.readyState : 'SSR',
+    };
+    
+    setDebugInfo(info);
+    console.log("Debug info:", info);
+    return info;
+  };
 
   // Use MiniKit polling to wait for MiniKit to be available
   useMiniKitPolling(() => {

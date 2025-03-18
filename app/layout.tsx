@@ -15,9 +15,11 @@ export const metadata: Metadata = {
 
 // Initialize the MiniKit when script loads
 const initMiniKitScript = `
+  window.WORLD_APP_ID = "app_a694eef5223a11d38b4f737fad00e561";
+  
   if (window.MiniKit && typeof window.MiniKit.init === 'function') {
     window.MiniKit.init({ 
-      appId: window.APP_ID || ''
+      appId: window.WORLD_APP_ID
     });
   }
 `;

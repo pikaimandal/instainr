@@ -27,6 +27,8 @@ declare global {
         }>;
       };
     };
+    WORLD_APP_ID?: string;
+    WORLD_APP_CHECK_COUNT?: number;
   }
 }
 

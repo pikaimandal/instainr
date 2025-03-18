@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { z } from "zod"
+import type {} from "@/lib/minikit" // Import types without importing any actual code
 
 interface AuthScreenProps {
   onAuthenticated: (userData: {
@@ -34,32 +35,54 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [miniKitLoaded, setMiniKitLoaded] = useState(false)
   const [appId, setAppId] = useState<string | null>(null)
+  const [isWorldAppEnvironment, setIsWorldAppEnvironment] = useState<boolean | null>(null)
 
   // Check if MiniKit is available and initialize
   useEffect(() => {
     const checkMiniKit = () => {
-      if (typeof window !== "undefined" && window.MiniKit) {
-        setMiniKitLoaded(true)
-        // If user is already authenticated in World App, we can get their username
-        if (window.MiniKit.user?.username) {
-          setUsername(window.MiniKit.user.username)
+      if (typeof window !== "undefined") {
+        if (window.MiniKit) {
+          setMiniKitLoaded(true)
+          setIsWorldAppEnvironment(true)
+          
+          // If user is already authenticated in World App, we can get their username
+          if (window.MiniKit.user?.username) {
+            setUsername(window.MiniKit.user.username || "")
+          }
+          
+          // If user is already authenticated with wallet, we can get their address
+          if (window.MiniKit.walletAddress) {
+            setWalletAddress(window.MiniKit.walletAddress || "")
+            setWorldIdVerified(true)
+            setStep("details")
+          }
+        } else {
+          // After 2 seconds of trying, assume we're not in World App
+          if (window.WORLD_APP_CHECK_COUNT === undefined) {
+            window.WORLD_APP_CHECK_COUNT = 0;
+          }
+          
+          window.WORLD_APP_CHECK_COUNT++;
+          
+          if (window.WORLD_APP_CHECK_COUNT > 4) { // Tried 5 times (2.5 seconds)
+            setIsWorldAppEnvironment(false);
+            return;
+          }
+          
+          // Check again in 500ms if not loaded yet
+          setTimeout(checkMiniKit, 500)
         }
-        // If user is already authenticated with wallet, we can get their address
-        if (window.MiniKit.walletAddress) {
-          setWalletAddress(window.MiniKit.walletAddress)
-          setWorldIdVerified(true)
-          setStep("details")
-        }
-      } else {
-        // Check again in 500ms if not loaded yet
-        setTimeout(checkMiniKit, 500)
       }
     }
     
     // Initialize MiniKit with app ID
     const initMiniKit = async () => {
       try {
-        // Fetch the appId from our backend
+        // In World App or regular web environment, get app ID
+        const defaultAppId = "app_a694eef5223a11d38b4f737fad00e561";
+        setAppId(window.WORLD_APP_ID || defaultAppId);
+        
+        // For regular web, also fetch from API
         const response = await fetch('/api/nonce')
         if (response.ok) {
           const data = await response.json()
@@ -76,7 +99,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
   // Handle World ID authentication using MiniKit Wallet Auth
   const handleWorldIdAuth = async () => {
-    if (!miniKitLoaded || !appId) {
+    if (isWorldAppEnvironment && (!miniKitLoaded || !appId)) {
       console.error("MiniKit not loaded or missing app ID")
       return
     }
@@ -92,43 +115,50 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       
       const { nonce } = await nonceResponse.json()
       
-      // Use MiniKit Wallet Auth command to authenticate
-      const { commandPayload, finalPayload } = await window.MiniKit.commandsAsync.walletAuth({
-        nonce: nonce,
-        expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
-        statement: "Sign in to InstaINR to convert your crypto to INR",
-        requestId: appId, // Using appId as requestId for tracking
-      })
-      
-      if (finalPayload.status === 'error') {
-        throw new Error(finalPayload.message || "Authentication failed")
+      if (isWorldAppEnvironment) {
+        // Use MiniKit Wallet Auth command to authenticate
+        const { commandPayload, finalPayload } = await window.MiniKit.commandsAsync.walletAuth({
+          nonce: nonce,
+          expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
+          statement: "Sign in to InstaINR to convert your crypto to INR",
+          requestId: appId!, // Using appId as requestId for tracking
+        })
+        
+        if (finalPayload.status === 'error') {
+          throw new Error(finalPayload.message || "Authentication failed")
+        }
+        
+        // Verify the signature on our backend
+        const verifyResponse = await fetch('/api/complete-siwe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payload: finalPayload,
+            nonce,
+            appId,
+          }),
+        })
+        
+        if (!verifyResponse.ok) {
+          throw new Error("Failed to verify authentication")
+        }
+        
+        const verifyResult = await verifyResponse.json()
+        
+        if (!verifyResult.isValid) {
+          throw new Error("Invalid authentication signature")
+        }
+        
+        // Set user data from World App
+        setWalletAddress(finalPayload.address)
+        setUsername(window.MiniKit.user?.username || "")
+        setWorldIdVerified(true)
+      } else {
+        // For web (non-World App environment), use a demo wallet address
+        setWalletAddress("0xDemoWallet123...789")
+        setUsername("DemoUser")
+        setWorldIdVerified(true)
       }
-      
-      // Verify the signature on our backend
-      const verifyResponse = await fetch('/api/complete-siwe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payload: finalPayload,
-          nonce,
-          appId,
-        }),
-      })
-      
-      if (!verifyResponse.ok) {
-        throw new Error("Failed to verify authentication")
-      }
-      
-      const verifyResult = await verifyResponse.json()
-      
-      if (!verifyResult.isValid) {
-        throw new Error("Invalid authentication signature")
-      }
-      
-      // Set user data from World App
-      setWalletAddress(finalPayload.address)
-      setUsername(window.MiniKit.user?.username || "")
-      setWorldIdVerified(true)
       
       // Move to details step
       setStep("details")
@@ -203,23 +233,27 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           
           <div className="bg-[#F0F0F8] rounded-lg p-4 mb-6">
             <p className="text-sm text-text-secondary">
-              InstaINR uses World ID to verify your identity. Authenticate with your World App wallet to continue.
+              {isWorldAppEnvironment 
+                ? "InstaINR uses World ID to verify your identity. Authenticate with your World App wallet to continue."
+                : "Authenticate to continue using InstaINR. Since you're not using World App, you'll get a demo account."}
             </p>
           </div>
           
           <button
             className="primary-button w-full flex items-center justify-center gap-2"
             onClick={handleWorldIdAuth}
-            disabled={isLoading || !miniKitLoaded}
+            disabled={isLoading || (isWorldAppEnvironment === true && !miniKitLoaded) || isWorldAppEnvironment === null}
           >
             {isLoading ? (
               <span className="animate-pulse">Authenticating...</span>
-            ) : !miniKitLoaded ? (
+            ) : isWorldAppEnvironment === null ? (
+              <span className="animate-pulse">Checking environment...</span>
+            ) : isWorldAppEnvironment && !miniKitLoaded ? (
               <span>Loading World App...</span>
             ) : (
               <>
                 <Image src="/images/worldcoin-logo.png" alt="World ID" width={24} height={24} />
-                <span>Authenticate with World App</span>
+                <span>{isWorldAppEnvironment ? "Authenticate with World App" : "Demo Authentication"}</span>
               </>
             )}
           </button>
@@ -236,7 +270,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           <div className="bg-success/10 text-success rounded-lg p-4 mb-6 flex items-start">
             <i className="fas fa-check-circle mt-1 mr-2"></i>
             <div>
-              <p className="font-medium">World App Authenticated</p>
+              <p className="font-medium">{isWorldAppEnvironment ? "World App Authenticated" : "Demo Authentication"}</p>
               <p className="text-sm">{walletAddress}</p>
               {username && <p className="text-sm mt-1">Username: {username}</p>}
             </div>

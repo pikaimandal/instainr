@@ -1,16 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import SplashScreen from "@/components/splash-screen"
-import Header from "@/components/header"
-import Navigation from "@/components/navigation"
-import BalanceCard from "@/components/balance-card"
-import ConversionCard from "@/components/conversion-card"
-import TransactionHistory from "@/components/transaction-history"
-import ProfileScreen from "@/components/profile-screen"
-import KYCScreen from "@/components/kyc-screen"
-import AuthScreen from "@/components/auth-screen"
-import Notification from "@/components/notification"
+import SplashScreen from "../components/splash-screen"
+import Header from "../components/header"
+import Navigation from "../components/navigation"
+import BalanceCard from "../components/balance-card"
+import ConversionCard from "../components/conversion-card"
+import TransactionHistory from "../components/transaction-history"
+import ProfileScreen from "../components/profile-screen"
+import KYCScreen from "../components/kyc-screen"
+import AuthScreen from "../components/auth-screen"
+import Notification from "../components/notification"
 
 export default function Home() {
   const [activeScreen, setActiveScreen] = useState("home-screen")
@@ -26,6 +26,22 @@ export default function Home() {
     type: "success" | "error" | "info"
   } | null>(null)
   const [kycComplete, setKycComplete] = useState(false)
+
+  // Check for URL query parameters (for redirects from dashboard)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const screenParam = urlParams.get('screen');
+      
+      if (screenParam && ['home-screen', 'history-screen', 'profile-screen', 'kyc-screen'].includes(screenParam)) {
+        setActiveScreen(screenParam);
+        
+        // Clean up the URL by removing the query parameter
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, []);
 
   // Mock data
   const balances = [
@@ -152,7 +168,11 @@ export default function Home() {
 
   // If user is not authenticated
   if (!user) {
-    return <AuthScreen onAuthenticated={handleAuthenticated} />
+    return (
+      <div className="h-screen">
+        <AuthScreen onAuthenticated={handleAuthenticated} />
+      </div>
+    )
   }
 
   return (

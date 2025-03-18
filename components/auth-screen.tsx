@@ -234,6 +234,38 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           throw new Error("Invalid authentication signature");
         }
         
+        // Create a new user with the wallet address as ID
+        const address = finalPayload.address || "";
+        const newUser = {
+          id: address,
+          address: address,
+          // Add other user properties as needed
+        };
+        
+        setUser(newUser);
+        setContextUser(newUser);
+        
+        // Call onAuthenticated if provided
+        if (typeof onAuthenticated === 'function') {
+          // Get username, if available
+          const displayName = window.MiniKit.user?.username || "World App User";
+          
+          onAuthenticated({
+            name: displayName,
+            worldId: address,
+            email: "",
+            phone: ""
+          });
+        } else {
+          // If no onAuthenticated prop, redirect to home page
+          router.push("/");
+          
+          toast({
+            title: "Authentication successful",
+            description: "You are now logged in with World App",
+          });
+        }
+        
         // Set user data from World App
         setWalletAddress(finalPayload.address || "");
         setUsername(window.MiniKit.user?.username || "");
@@ -241,6 +273,36 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       } else {
         console.log("Using demo authentication for web environment");
         // For web (non-World App environment), use a demo wallet address
+        
+        // Create demo user
+        const demoAddress = "0xDemoWallet123...789";
+        const newUser = {
+          id: demoAddress,
+          address: demoAddress,
+          // Add other user properties as needed
+        };
+        
+        setUser(newUser);
+        setContextUser(newUser);
+        
+        // Call onAuthenticated if provided
+        if (typeof onAuthenticated === 'function') {
+          onAuthenticated({
+            name: "DemoUser",
+            worldId: demoAddress,
+            email: "",
+            phone: ""
+          });
+        } else {
+          // If no onAuthenticated prop, redirect to home page
+          router.push("/");
+          
+          toast({
+            title: "Demo authentication successful",
+            description: "You are now logged in with a demo account",
+          });
+        }
+        
         setWalletAddress("0xDemoWallet123...789");
         setUsername("DemoUser");
         setWorldIdVerified(true);
@@ -410,12 +472,24 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         
         setUser(newUser)
         setContextUser(newUser)
-        router.push("/dashboard")
         
-        toast({
-          title: "Verification successful",
-          description: "You are now logged in with World ID",
-        })
+        // Call the onAuthenticated prop if provided
+        if (typeof onAuthenticated === 'function') {
+          onAuthenticated({
+            name: username || "World ID User",
+            worldId: proof.nullifier_hash,
+            email: "",
+            phone: ""
+          })
+        } else {
+          // If no onAuthenticated prop, redirect to home page
+          router.push("/");
+          
+          toast({
+            title: "Verification successful",
+            description: "You are now logged in with World ID",
+          });
+        }
       } else {
         throw new Error(response.error || "Verification failed")
       }

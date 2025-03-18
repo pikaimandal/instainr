@@ -5,7 +5,29 @@ import { useRouter } from "next/navigation"
 import { useUserContext } from "../user-provider"
 import Link from "next/link"
 
-export default function DashboardPage() {
+export default function DashboardRedirect() {
+  const { user, loading } = useUserContext()
+  const router = useRouter()
+
+  useEffect(() => {
+    // If user is authenticated, redirect to home with profile active
+    if (user) {
+      router.push("/?screen=profile-screen")
+    } else if (!loading) {
+      // If not authenticated and not loading, redirect to home
+      router.push("/")
+    }
+  }, [user, loading, router])
+
+  // Show a loading state while redirecting
+  return (
+    <div className="flex justify-center items-center min-h-screen">
+      <div className="animate-pulse">Redirecting...</div>
+    </div>
+  )
+}
+
+export function DashboardPage() {
   const { user, loading } = useUserContext()
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)

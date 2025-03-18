@@ -4,6 +4,15 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { z } from "zod"
 import type {} from "@/lib/minikit" // Import types without importing any actual code
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
+import { getUser, setUser } from "@/lib/store"
+import { useUserContext } from "@/app/user-provider"
+import { useRouter } from "next/navigation"
+import { IDKitWidget, VerificationLevel } from "@worldcoin/idkit"
+import { verifyWorldId, mockSiweVerify } from "@/lib/actions"
+import { useMiniKitPolling, detectWorldApp } from "@/lib/minikit"
 
 interface AuthScreenProps {
   onAuthenticated: (userData: {
@@ -22,6 +31,9 @@ const userSchema = z.object({
 })
 
 export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
+  const { toast } = useToast()
+  const { user, setUser: setContextUser } = useUserContext()
+  const router = useRouter()
   const [step, setStep] = useState<"auth" | "details">("auth")
   const [worldIdVerified, setWorldIdVerified] = useState(false)
   const [walletAddress, setWalletAddress] = useState("")
@@ -37,180 +49,167 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [appId, setAppId] = useState<string | null>(null)
   const [isWorldAppEnvironment, setIsWorldAppEnvironment] = useState<boolean | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({})
 
-  console.log("Component mounted, checking environment...")
-
-  // Check if MiniKit is available and initialize
   useEffect(() => {
-    // Simple check: if running in an iframe, likely in World App
-    const isInIframe = window !== window.parent
-    console.log("Is in iframe:", isInIframe)
+    // Capture debug info to help troubleshoot
+    const captureDebugInfo = () => {
+      const info: Record<string, any> = {
+        isInIframe: window !== window.parent,
+        userAgent: navigator.userAgent,
+        hasMiniKit: !!window.MiniKit,
+        miniKitVersion: window.MiniKit && 'version' in window.MiniKit ? window.MiniKit.version : 'unknown',
+        windowKeys: Object.keys(window).filter(k => k.toLowerCase().includes('world') || k.toLowerCase().includes('mini')),
+        documentReady: document.readyState,
+      };
+      
+      setDebugInfo(info);
+      console.log("Debug info:", info);
+    };
 
-    const checkMiniKit = () => {
-      if (typeof window !== "undefined") {
-        // Log what window.MiniKit contains
-        console.log("MiniKit check:", window.MiniKit ? "found" : "not found", window.MiniKit)
+    // Try to detect World App using multiple methods
+    const detectWorldApp = () => {
+      const isInIframe = window !== window.parent;
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isWorldAppUserAgent = userAgent.includes('world');
+      const worldAppUrlIndicator = window.location.href.includes('worldapp');
+      
+      // Check for MiniKit.isInstalled() for the most reliable detection
+      if (window.MiniKit && typeof window.MiniKit.isInstalled === 'function') {
+        const isInstalled = window.MiniKit.isInstalled();
+        console.log("MiniKit.isInstalled() returned:", isInstalled);
         
-        // Direct check if MiniKit reports it's in World App
-        if (window.MiniKit?.isInWorldApp) {
-          console.log("MiniKit.isInWorldApp reports true")
-          setIsWorldAppEnvironment(true)
-          setMiniKitLoaded(true)
-          return
+        // If MiniKit reports it's installed in World App, trust that
+        if (isInstalled) {
+          setMiniKitLoaded(true);
+          setIsWorldAppEnvironment(true);
+          return true;
         }
-        
-        // Check if MiniKit exists and can be used
-        if (window.MiniKit && typeof window.MiniKit.isInstalled === 'function') {
-          const isInstalled = window.MiniKit.isInstalled()
-          console.log("MiniKit.isInstalled() returned:", isInstalled)
-          
-          if (isInstalled) {
-            setMiniKitLoaded(true)
-            setIsWorldAppEnvironment(true)
-            
-            // If user is already authenticated in World App, we can get their username
-            if (window.MiniKit.user?.username) {
-              setUsername(window.MiniKit.user.username || "")
-            }
-            
-            // If user is already authenticated with wallet, we can get their address
-            if (window.MiniKit.walletAddress) {
-              setWalletAddress(window.MiniKit.walletAddress || "")
-              setWorldIdVerified(true)
-              setStep("details")
-            }
-            return
-          }
-        }
-        
-        // More reliable detection: use the user agent
-        const userAgent = navigator.userAgent.toLowerCase()
-        if (
-          userAgent.includes('world') || 
-          isInIframe || 
-          window.location.href.includes('worldapp.co')
-        ) {
-          console.log("Detected World App via user agent or iframe")
-          setIsWorldAppEnvironment(true)
-          
-          // Still waiting for MiniKit to initialize
-          if (window.WORLD_APP_CHECK_COUNT === undefined) {
-            window.WORLD_APP_CHECK_COUNT = 0
-          } else if (window.WORLD_APP_CHECK_COUNT > 10) { // 5 seconds max
-            setErrorMessage("MiniKit failed to initialize in World App")
-            return
-          }
-          
-          window.WORLD_APP_CHECK_COUNT++
-          setTimeout(checkMiniKit, 500)
-          return
-        }
-
-        // After 2 seconds of trying, assume we're not in World App
-        if (window.WORLD_APP_CHECK_COUNT === undefined) {
-          window.WORLD_APP_CHECK_COUNT = 0
-        }
-        
-        window.WORLD_APP_CHECK_COUNT++
-        
-        if (window.WORLD_APP_CHECK_COUNT > 4) { // Tried 5 times (2.5 seconds)
-          console.log("Not in World App environment after multiple checks")
-          setIsWorldAppEnvironment(false)
-          return
-        }
-        
-        // Check again in 500ms if not loaded yet
-        setTimeout(checkMiniKit, 500)
       }
-    }
+      
+      // Secondary detection methods (less reliable)
+      if (isWorldAppUserAgent || isInIframe || worldAppUrlIndicator) {
+        console.log("World App detected via secondary methods");
+        return true;
+      }
+      
+      return false;
+    };
     
-    // Initialize MiniKit with app ID
-    const initMiniKit = async () => {
-      try {
-        // In World App or regular web environment, get app ID
-        const defaultAppId = "app_a694eef5223a11d38b4f737fad00e561"
-        setAppId(window.WORLD_APP_ID || defaultAppId)
-        console.log("AppID set to:", window.WORLD_APP_ID || defaultAppId)
+    const checkMiniKit = () => {
+      captureDebugInfo();
+      
+      if (window.MiniKit) {
+        console.log("MiniKit found on window");
+        setMiniKitLoaded(true);
         
-        // For regular web, also fetch from API
-        const response = await fetch('/api/nonce')
+        // If detectWorldApp confirms we're in World App
+        if (detectWorldApp()) {
+          setIsWorldAppEnvironment(true);
+          
+          // Try to get user info if already authenticated
+          if (window.MiniKit.walletAddress) {
+            console.log("User already authenticated:", window.MiniKit.walletAddress);
+            setWalletAddress(window.MiniKit.walletAddress);
+            setUsername(window.MiniKit.user?.username || "");
+            setWorldIdVerified(true);
+            setStep("details");
+          }
+          return;
+        }
+      }
+      
+      // Set app as running outside World App after reasonable attempts
+      if (window.WORLD_APP_CHECK_COUNT === undefined) {
+        window.WORLD_APP_CHECK_COUNT = 0;
+      }
+      
+      window.WORLD_APP_CHECK_COUNT++;
+      
+      // After 5 attempts (2.5 seconds), assume not in World App
+      if (window.WORLD_APP_CHECK_COUNT > 5) {
+        console.log("Not detected as World App environment after multiple attempts");
+        setIsWorldAppEnvironment(false);
+        return;
+      }
+      
+      // Try again in 500ms
+      setTimeout(checkMiniKit, 500);
+    };
+    
+    // Initialize with app ID and start detection
+    const initializeApp = async () => {
+      const defaultAppId = "app_a694eef5223a11d38b4f737fad00e561";
+      setAppId(window.WORLD_APP_ID || defaultAppId);
+      
+      try {
+        // Fetch nonce which also provides app ID
+        const response = await fetch('/api/nonce');
         if (response.ok) {
-          const data = await response.json()
+          const data = await response.json();
           if (data.appId) {
-            setAppId(data.appId)
-            console.log("AppID from API:", data.appId)
+            setAppId(data.appId);
           }
         }
       } catch (error) {
-        console.error("Failed to get app credentials:", error)
+        console.error("Failed to get app credentials:", error);
       }
-    }
+      
+      // Start detection process
+      checkMiniKit();
+    };
     
-    initMiniKit()
-    checkMiniKit()
-  }, [])
+    initializeApp();
+    
+    // If document not yet loaded, try again when it is
+    if (document.readyState !== 'complete') {
+      window.addEventListener('load', () => {
+        console.log("Window loaded, checking MiniKit again");
+        checkMiniKit();
+      });
+    }
+  }, []);
 
-  // Handle World ID authentication using MiniKit Wallet Auth
+  // Handle World ID authentication using wallet auth (more reliable in World App)
   const handleWorldIdAuth = async () => {
-    if (isWorldAppEnvironment && (!miniKitLoaded || !appId)) {
-      console.error("MiniKit not loaded or missing app ID")
-      setErrorMessage("MiniKit not loaded or missing app ID. Please try again.")
-      return
+    if (isWorldAppEnvironment && !miniKitLoaded) {
+      setErrorMessage("World App detected but MiniKit not loaded. Please try again or restart the app.");
+      return;
     }
     
-    setIsLoading(true)
-    setErrorMessage(null)
+    setIsLoading(true);
+    setErrorMessage(null);
     
     try {
       // Get nonce from our backend
-      const nonceResponse = await fetch('/api/nonce')
+      const nonceResponse = await fetch('/api/nonce');
       if (!nonceResponse.ok) {
-        throw new Error("Failed to get authentication nonce")
+        throw new Error("Failed to get authentication nonce");
       }
       
-      const { nonce } = await nonceResponse.json()
-      console.log("Got nonce:", nonce)
+      const { nonce } = await nonceResponse.json();
+      console.log("Got nonce:", nonce);
       
       if (isWorldAppEnvironment) {
-        console.log("Authenticating in World App environment...")
+        console.log("Authenticating in World App environment...");
         
-        // First try the verify command (preferred for World ID verification)
-        try {
-          if (window.MiniKit.commandsAsync.verify) {
-            console.log("Using verify command...")
-            const { commandPayload, finalPayload } = await window.MiniKit.commandsAsync.verify({
-              action: "auth",
-              signal: nonce
-            })
-            
-            if (finalPayload.status === 'success') {
-              console.log("Verify successful:", finalPayload)
-              // Set a demo wallet address since we verified with World ID directly
-              setWalletAddress("world_id_verified_" + finalPayload.nullifier_hash?.substring(0, 10))
-              setUsername(window.MiniKit.user?.username || "WorldApp User")
-              setWorldIdVerified(true)
-              setStep("details")
-              setIsLoading(false)
-              return
-            }
-          }
-        } catch (verifyError) {
-          console.error("Verify failed, falling back to walletAuth:", verifyError)
+        // Preferred method: wallet auth for World App (more reliable)
+        console.log("Using walletAuth command...");
+        
+        if (!window.MiniKit.commandsAsync?.walletAuth) {
+          throw new Error("walletAuth method not available on MiniKit");
         }
         
-        // Fall back to wallet auth if verify isn't available
-        console.log("Using walletAuth command...")
-        const { commandPayload, finalPayload } = await window.MiniKit.commandsAsync.walletAuth({
+        const { finalPayload } = await window.MiniKit.commandsAsync.walletAuth({
           nonce: nonce,
           expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
           statement: "Sign in to InstaINR to convert your crypto to INR",
-          requestId: appId!, // Using appId as requestId for tracking
-        })
+        });
         
-        console.log("WalletAuth response:", finalPayload)
+        console.log("WalletAuth response:", finalPayload);
         
         if (finalPayload.status === 'error') {
-          throw new Error(finalPayload.message || "Authentication failed")
+          throw new Error(finalPayload.message || "Authentication failed");
         }
         
         // Verify the signature on our backend
@@ -222,40 +221,40 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             nonce,
             appId,
           }),
-        })
+        });
         
         if (!verifyResponse.ok) {
-          throw new Error("Failed to verify authentication")
+          throw new Error("Failed to verify authentication");
         }
         
-        const verifyResult = await verifyResponse.json()
-        console.log("Backend verification result:", verifyResult)
+        const verifyResult = await verifyResponse.json();
+        console.log("Backend verification result:", verifyResult);
         
         if (!verifyResult.isValid) {
-          throw new Error("Invalid authentication signature")
+          throw new Error("Invalid authentication signature");
         }
         
         // Set user data from World App
-        setWalletAddress(finalPayload.address || "")
-        setUsername(window.MiniKit.user?.username || "")
-        setWorldIdVerified(true)
+        setWalletAddress(finalPayload.address || "");
+        setUsername(window.MiniKit.user?.username || "");
+        setWorldIdVerified(true);
       } else {
-        console.log("Using demo authentication for web environment")
+        console.log("Using demo authentication for web environment");
         // For web (non-World App environment), use a demo wallet address
-        setWalletAddress("0xDemoWallet123...789")
-        setUsername("DemoUser")
-        setWorldIdVerified(true)
+        setWalletAddress("0xDemoWallet123...789");
+        setUsername("DemoUser");
+        setWorldIdVerified(true);
       }
       
       // Move to details step
-      setStep("details")
+      setStep("details");
     } catch (error: any) {
-      console.error("Authentication error:", error)
-      setErrorMessage(error.message || "Authentication failed. Please try again.")
+      console.error("Authentication error:", error);
+      setErrorMessage(error.message || "Authentication failed. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,6 +305,101 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }
 
+  // Enhanced World App detection
+  const detectWorldAppEnv = async () => {
+    const isWorldApp = await detectWorldApp()
+    setIsWorldAppEnvironment(isWorldApp)
+    return isWorldApp
+  }
+
+  // Function to check and initialize MiniKit
+  const checkMiniKit = async () => {
+    try {
+      setIsLoading(true)
+      setErrorMessage(null)
+      
+      // Detect World App environment
+      const isWorldApp = await detectWorldAppEnv()
+      
+      // Capture debug info
+      const debugData = captureDebugInfo()
+      console.log("Debug info:", debugData)
+      
+      if (isWorldApp) {
+        console.log("We are in World App, using wallet auth")
+        // In World App environment, use wallet auth
+        await handleWorldIdAuth()
+      } else {
+        console.log("Not in World App, showing World ID widget")
+        // Show World ID widget for non-World App environments
+        // This is handled by the IDKitWidget component in the UI
+      }
+    } catch (error) {
+      console.error("MiniKit check failed:", error)
+      setErrorMessage(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Use MiniKit polling to wait for MiniKit to be available
+  useMiniKitPolling(() => {
+    console.log("MiniKit polling callback triggered")
+    detectWorldAppEnv()
+    captureDebugInfo()
+  })
+
+  useEffect(() => {
+    // First run detection on component mount
+    detectWorldAppEnv()
+    captureDebugInfo()
+  }, [])
+
+  // Handle successful verification from IDKitWidget
+  const handleVerify = async (proof: any) => {
+    try {
+      setIsLoading(true)
+      
+      // Verify the proof with our backend
+      const response = await verifyWorldId(
+        proof.merkle_root,
+        proof.nullifier_hash,
+        proof.proof,
+        VerificationLevel.Device
+      )
+      
+      if (response.success) {
+        // Create a new user with the nullifier hash as ID
+        const newUser = {
+          id: proof.nullifier_hash,
+          nullifierHash: proof.nullifier_hash,
+          // Add other user properties as needed
+        }
+        
+        setUser(newUser)
+        setContextUser(newUser)
+        router.push("/dashboard")
+        
+        toast({
+          title: "Verification successful",
+          description: "You are now logged in with World ID",
+        })
+      } else {
+        throw new Error(response.error || "Verification failed")
+      }
+    } catch (error) {
+      console.error("Verification error:", error)
+      
+      toast({
+        variant: "destructive",
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "Failed to verify",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)]">
       {step === "auth" ? (
@@ -334,7 +428,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           
           <button
             className="primary-button w-full flex items-center justify-center gap-2"
-            onClick={handleWorldIdAuth}
+            onClick={checkMiniKit}
             disabled={isLoading || (isWorldAppEnvironment === true && !miniKitLoaded) || isWorldAppEnvironment === null}
           >
             {isLoading ? (
@@ -354,6 +448,15 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           <div className="mt-6 text-center text-xs text-text-tertiary">
             <p>Environment: {isWorldAppEnvironment === null ? "Detecting..." : isWorldAppEnvironment ? "World App" : "Web Browser"}</p>
             <p>MiniKit: {miniKitLoaded ? "Loaded" : "Not Loaded"}</p>
+            {Object.keys(debugInfo).length > 0 && (
+              <div className="text-left mt-4 border-t pt-4 border-border">
+                <p className="font-medium mb-1">Debug Info:</p>
+                <p>In iframe: {debugInfo.isInIframe ? "Yes" : "No"}</p>
+                <p>MiniKit present: {debugInfo.hasMiniKit ? "Yes" : "No"}</p>
+                <p>MiniKit version: {debugInfo.miniKitVersion}</p>
+                <p className="mt-1 text-[10px] break-all">User agent: {debugInfo.userAgent}</p>
+              </div>
+            )}
           </div>
         </div>
       ) : (

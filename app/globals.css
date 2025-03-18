@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: 240 99% 65%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 9%;
+  --secondary-foreground: 0 0% 100%;
+  --background: 248 100% 98%;
+  --foreground: 240 10% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 4%;
+  --border: 240 30% 96%;
+  --input: 240 30% 96%;
+  --ring: 240 99% 65%;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Inter", sans-serif;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: #1a1a2e;
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  .app-container {
+    max-width: 480px;
+    min-height: 100vh;
+    margin: 0 auto;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background-color: hsl(var(--background));
+  }
+
+  .screen {
+    display: none;
+  }
+
+  .screen.active {
+    display: block;
+  }
+
+  .primary-button {
+    height: 48px;
+    background-color: #5452f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .primary-button:hover {
+    background-color: #4240c0;
+  }
+
+  .secondary-button {
+    height: 48px;
+    background-color: transparent;
+    color: #5452f6;
+    border: 1px solid #5452f6;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .secondary-button:hover {
+    background-color: rgba(84, 82, 246, 0.05);
+  }
+
+  .danger-button {
+    height: 48px;
+    background-color: #ff5a5a;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .danger-button:hover {
+    background-color: #ff3b3b;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: none;
+    border: none;
+    color: #6e6e96;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+
+  .nav-item i {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .nav-item.active {
+    color: #5452f6;
+    background-color: rgba(84, 82, 246, 0.05);
+  }
+}
+

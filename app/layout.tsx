@@ -15,13 +15,33 @@ export const metadata: Metadata = {
 
 // Initialize the MiniKit when script loads
 const initMiniKitScript = `
+  // Set the app ID
   window.WORLD_APP_ID = "app_a694eef5223a11d38b4f737fad00e561";
   
-  if (window.MiniKit && typeof window.MiniKit.init === 'function') {
-    window.MiniKit.init({ 
-      appId: window.WORLD_APP_ID
-    });
+  // Log if we're in an iframe to help debug
+  console.log("In iframe: " + (window !== window.parent));
+  
+  // Listen for MiniKit being available
+  function waitForMiniKit() {
+    console.log("Checking for MiniKit...");
+    if (window.MiniKit) {
+      console.log("MiniKit found, initializing...");
+      try {
+        window.MiniKit.init({ 
+          appId: window.WORLD_APP_ID
+        });
+        console.log("MiniKit initialized with appId:", window.WORLD_APP_ID);
+      } catch (e) {
+        console.error("MiniKit initialization failed:", e);
+      }
+    } else {
+      console.log("MiniKit not found, trying again in 500ms");
+      setTimeout(waitForMiniKit, 500);
+    }
   }
+  
+  // Start checking for MiniKit
+  waitForMiniKit();
 `;
 
 export default function RootLayout({

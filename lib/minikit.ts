@@ -8,6 +8,7 @@ declare global {
         profilePictureUrl?: string;
       };
       walletAddress?: string;
+      isInWorldApp?: boolean;
       commandsAsync: {
         walletAuth: (input: {
           nonce: string;
@@ -23,6 +24,19 @@ declare global {
             signature?: string;
             address?: string;
             version?: number;
+          };
+        }>;
+        verify?: (input: {
+          action: string;
+          signal?: string;
+        }) => Promise<{
+          commandPayload: any;
+          finalPayload: {
+            status: 'success' | 'error';
+            message?: string;
+            nullifier_hash?: string;
+            merkle_root?: string;
+            proof?: string;
           };
         }>;
       };

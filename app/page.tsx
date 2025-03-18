@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import SplashScreen from "@/components/splash-screen"
 import Header from "@/components/header"
 import Navigation from "@/components/navigation"
@@ -9,14 +9,23 @@ import ConversionCard from "@/components/conversion-card"
 import TransactionHistory from "@/components/transaction-history"
 import ProfileScreen from "@/components/profile-screen"
 import KYCScreen from "@/components/kyc-screen"
+import AuthScreen from "@/components/auth-screen"
 import Notification from "@/components/notification"
 
 export default function Home() {
   const [activeScreen, setActiveScreen] = useState("home-screen")
+  const [showSplash, setShowSplash] = useState(true)
+  const [user, setUser] = useState<{
+    name: string;
+    worldId: string;
+    email: string;
+    phone: string;
+  } | null>(null)
   const [notification, setNotification] = useState<{
     message: string
     type: "success" | "error" | "info"
   } | null>(null)
+  const [kycComplete, setKycComplete] = useState(false)
 
   // Mock data
   const balances = [
@@ -59,55 +68,96 @@ export default function Home() {
     },
   ]
 
-  const user = {
-    name: "John Doe",
-    worldId: "0x71C...8F3E",
-    email: "john.doe@example.com",
-    phone: "+91 98765 43210",
-  }
-
   const bankAccount = {
     bankName: "State Bank of India",
     accountNumber: "XXXX XXXX 5678",
     accountName: "John Doe",
   }
 
-  const documents = [
-    {
-      type: "Aadhaar Card",
-      number: "XXXX XXXX 1234",
-      verified: true,
-    },
-    {
-      type: "PAN Card",
-      number: "ABCDE1234F",
-      verified: true,
-    },
-  ]
-
-  const showNotification = (message: string, type: "success" | "error" | "info" = "info") => {
-    setNotification({ message, type })
+  const documents = {
+    idVerified: kycComplete,
+    addressVerified: kycComplete,
   }
 
-  const handleProfileClick = () => {
+  // Check for existing user on mount (would use Supabase in real app)
+  useEffect(() => {
+    // Simulate checking for existing user
+    const checkUser = async () => {
+      // In a real app, this would be a Supabase query
+      const storedUser = localStorage.getItem("instaInrUser")
+      
+      if (storedUser) {
+        setUser(JSON.parse(storedUser))
+      }
+      
+      // Hide splash screen after checking
+      setTimeout(() => {
+        setShowSplash(false)
+      }, 2000)
+    }
+    
+    checkUser()
+  }, [])
+
+  // Handle user authentication
+  const handleAuthenticated = (userData: {
+    name: string;
+    worldId: string;
+    email: string;
+    phone: string;
+  }) => {
+    // In a real app, this would save to Supabase
+    setUser(userData)
+    localStorage.setItem("instaInrUser", JSON.stringify(userData))
+    
+    // Navigate to KYC screen
+    setActiveScreen("kyc-screen")
+    showNotification("Account created successfully!", "success")
+  }
+
+  // Handle KYC completion
+  const handleKYCComplete = () => {
+    setKycComplete(true)
+    showNotification("KYC documents submitted successfully!", "success")
     setActiveScreen("profile-screen")
   }
 
+  // Handle conversion completion
   const handleConversionComplete = () => {
-    showNotification("Conversion initiated successfully!", "success")
     setActiveScreen("history-screen")
+    showNotification("Conversion initiated successfully!", "success")
   }
 
+  // Handle logout
   const handleLogout = () => {
-    showNotification("Logged out successfully", "info")
-    // In a real app, you would handle logout logic here
+    // In a real app, this would call Supabase auth.signOut()
+    setUser(null)
+    localStorage.removeItem("instaInrUser")
+    showNotification("You have been logged out", "info")
+    setActiveScreen("home-screen")
+  }
+
+  // Show notification
+  const showNotification = (message: string, type: "success" | "error" | "info") => {
+    setNotification({ message, type })
+    setTimeout(() => {
+      setNotification(null)
+    }, 5000)
+  }
+
+  // If splash screen is showing
+  if (showSplash) {
+    return <SplashScreen />
+  }
+
+  // If user is not authenticated
+  if (!user) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} />
   }
 
   return (
     <>
-      <SplashScreen />
-
-      <Header onProfileClick={handleProfileClick} />
+      <Header userInitial={user.name.charAt(0)} />
 
       <main className="flex-1 p-5 pb-20 overflow-y-auto">
         {/* Home / Conversion Screen */}
@@ -126,17 +176,19 @@ export default function Home() {
 
         {/* Profile Screen */}
         <section className={`${activeScreen === "profile-screen" ? "block" : "hidden"}`}>
-          <ProfileScreen user={user} bankAccount={bankAccount} documents={documents} onLogout={handleLogout} />
+          <ProfileScreen 
+            user={user} 
+            bankAccount={bankAccount} 
+            documents={documents} 
+            onLogout={handleLogout} 
+          />
         </section>
 
         {/* KYC Screen */}
         <section className={`${activeScreen === "kyc-screen" ? "block" : "hidden"}`}>
           <KYCScreen
             onBack={() => setActiveScreen("profile-screen")}
-            onContinue={() => {
-              showNotification("KYC documents submitted successfully!", "success")
-              setActiveScreen("profile-screen")
-            }}
+            onContinue={handleKYCComplete}
           />
         </section>
       </main>

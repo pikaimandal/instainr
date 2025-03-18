@@ -3,14 +3,24 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
+import Script from "next/script"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "InstaINR - Convert your crypto to INR instantly",
   description: "Convert your crypto to INR instantly with InstaINR",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
+
+// Initialize the MiniKit when script loads
+const initMiniKitScript = `
+  if (window.MiniKit && typeof window.MiniKit.init === 'function') {
+    window.MiniKit.init({ 
+      appId: window.APP_ID || ''
+    });
+  }
+`;
 
 export default function RootLayout({
   children,
@@ -22,15 +32,26 @@ export default function RootLayout({
       <head>
         <link
           rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
-          crossOrigin="anonymous"
-          referrerPolicy="no-referrer"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
         />
+        {/* Add MiniKit script */}
+        <Script
+          src="https://cdn.jsdelivr.net/npm/@worldcoin/minikit-js@1/dist/minikit.js"
+          strategy="beforeInteractive"
+        />
+        {/* Initialize MiniKit after it loads */}
+        <Script id="init-minikit" strategy="afterInteractive">
+          {initMiniKitScript}
+        </Script>
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light">
-          <div className="app-container">{children}</div>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
         </ThemeProvider>
       </body>
     </html>

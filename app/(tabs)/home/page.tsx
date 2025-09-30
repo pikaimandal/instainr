@@ -9,13 +9,25 @@ import { SellForm } from "@/components/sell-form"
 import { HelpSheet } from "@/components/help-sheet"
 import { User, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function HomePage() {
   const { connected, username, disconnect } = useWallet()
   const router = useRouter()
   const { data: prices } = usePrices()
-  const displayName = !username || username === "World App User" ? "pikai.1111" : username
+  
+  // Redirect to splash if not connected
+  useEffect(() => {
+    if (!connected) {
+      router.replace("/")
+    }
+  }, [connected, router])
+
+  const handleLogout = () => {
+    disconnect()
+    router.replace("/") // Immediate redirect to splash
+  }
 
   return (
     <main className="mx-auto max-w-md px-4 pt-4 pb-20">
@@ -23,7 +35,7 @@ export default function HomePage() {
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm inline-flex items-center gap-1.5">
           <User className="h-4 w-4" aria-hidden="true" />
-          <span className="font-medium">{displayName}</span>
+          <span className="font-medium">{username || "World App User"}</span>
         </div>
         <div className="text-center">
           <h1 className="text-base font-semibold tracking-tight">InstaINR</h1>
@@ -40,12 +52,7 @@ export default function HomePage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem
-                onClick={() => {
-                  disconnect()
-                  router.replace("/")
-                }}
-              >
+              <DropdownMenuItem onClick={handleLogout}>
                 Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>

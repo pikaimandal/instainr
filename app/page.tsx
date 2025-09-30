@@ -5,18 +5,25 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useWallet } from "@/hooks/use-wallet"
+import { useMiniKit } from "@/components/minikit-provider"
 
 export default function SplashPage() {
   const router = useRouter()
   const { connected, connect } = useWallet()
+  const { isInitialized, isInstalled } = useMiniKit()
   const [showButton, setShowButton] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const t = setTimeout(() => setShowButton(true), 2000)
-    return () => clearTimeout(t)
-  }, [])
+    // Show button only after MiniKit is initialized and minimum 2 seconds have passed
+    if (isInitialized) {
+      const t = setTimeout(() => setShowButton(true), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [isInitialized])
 
   useEffect(() => {
     if (connected) {
@@ -31,19 +38,40 @@ export default function SplashPage() {
         <h1 className="text-2xl font-semibold tracking-tight">InstaINR</h1>
         <p className="text-sm text-muted-foreground max-w-sm">Sell WLD, ETH, and USDC.e for instant INR payouts.</p>
       </div>
-      {showButton ? (
-        <Button
-          size="lg"
-          className="rounded-lg"
-          onClick={async () => {
-            await connect()
-            router.replace("/home")
-          }}
-        >
-          Connect Wallet
-        </Button>
+      {showButton && isInstalled ? (
+        <div className="flex flex-col items-center gap-2">
+          <Button
+            size="lg"
+            className="rounded-lg"
+            disabled={isConnecting}
+            onClick={async () => {
+              setIsConnecting(true)
+              setError(null)
+              try {
+                await connect()
+                router.replace("/home")
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Connection failed")
+                setIsConnecting(false)
+              }
+            }}
+          >
+            {isConnecting ? "Connecting..." : "Connect Wallet"}
+          </Button>
+          {error && (
+            <p className="text-xs text-destructive text-center max-w-sm">
+              {error}
+            </p>
+          )}
+        </div>
+      ) : showButton && !isInstalled ? (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            Please open this app in World App to connect your wallet.
+          </p>
+        </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <p className="text-xs text-muted-foreground">Getting ready…</p>
       )}
       <p className="text-[11px] text-muted-foreground mt-8">
         By continuing you agree to our{" "}

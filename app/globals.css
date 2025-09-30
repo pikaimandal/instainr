@@ -4,28 +4,28 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.14 0 0);
-  --card: var(--background);
+  --background: oklch(0.08 0 0); /* very dark background */
+  --foreground: oklch(0.98 0 0); /* white text */
+  --card: oklch(0.12 0 0); /* slightly lighter dark for cards */
   --card-foreground: var(--foreground);
-  --popover: var(--background);
+  --popover: var(--card);
   --popover-foreground: var(--foreground);
 
   --primary: oklch(0.58 0.15 240); /* blue */
   --primary-foreground: oklch(0.98 0 0); /* on-blue: near-white */
   --accent: oklch(0.68 0.1 200); /* teal */
-  --accent-foreground: oklch(0.14 0 0); /* on-teal: dark for readability */
+  --accent-foreground: oklch(0.98 0 0); /* white on teal */
 
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.18 0 0); /* dark secondary */
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.56 0 0);
-  --destructive: var(--primary); /* reuse primary to avoid extra hue */
-  --destructive-foreground: var(--primary-foreground);
+  --muted: oklch(0.15 0 0); /* dark muted */
+  --muted-foreground: oklch(0.68 0 0); /* lighter gray for muted text */
+  --destructive: oklch(0.62 0.2 0); /* red for destructive */
+  --destructive-foreground: var(--foreground);
 
-  --border: oklch(0.92 0 0);
-  --input: var(--border);
-  --ring: oklch(0.72 0 0);
+  --border: oklch(0.25 0 0); /* dark border */
+  --input: oklch(0.16 0 0); /* dark input background */
+  --ring: oklch(0.58 0.15 240); /* primary color for focus rings */
 
   --chart-1: oklch(0.62 0.16 240); /* blue */
   --chart-2: oklch(0.7 0.1 200); /* teal */
@@ -35,7 +35,7 @@
 
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
@@ -46,7 +46,7 @@
 }
 
 .dark {
-  --background: oklch(0.15 0 0);
+  --background: oklch(0.08 0 0);
   --foreground: oklch(0.98 0 0);
   --card: var(--background);
   --card-foreground: var(--foreground);

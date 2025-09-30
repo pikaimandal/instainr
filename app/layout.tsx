@@ -19,13 +19,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         {/* Prevent zoom and emulate native app behavior */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <meta name="theme-color" content="#0ea5a8" />
+        <meta name="theme-color" content="#141414" />
       </head>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased bg-background text-foreground min-h-screen`}>
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
       </body>

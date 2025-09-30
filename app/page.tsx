@@ -35,8 +35,8 @@ export default function SplashPage() {
         <Button
           size="lg"
           className="rounded-lg"
-          onClick={() => {
-            connect()
+          onClick={async () => {
+            await connect()
             router.replace("/home")
           }}
         >

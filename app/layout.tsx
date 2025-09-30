@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
+import MiniKitProvider from "@/components/minikit-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -26,7 +27,9 @@ export default function RootLayout({
         <meta name="theme-color" content="#141414" />
       </head>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased bg-background text-foreground min-h-screen`}>
-        <Suspense fallback={null}>{children}</Suspense>
+        <MiniKitProvider>
+          <Suspense fallback={null}>{children}</Suspense>
+        </MiniKitProvider>
         <Analytics />
       </body>
     </html>

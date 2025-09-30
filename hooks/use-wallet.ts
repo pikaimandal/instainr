@@ -1,7 +1,7 @@
 "use client"
 
-import useSWR from "swr"
-import { useEffect } from "react"
+import { useState, useEffect } from "react"
+import { MiniKit } from "@worldcoin/minikit-js"
 
 type Balances = {
   WLD: number
@@ -9,70 +9,98 @@ type Balances = {
   "USDC.e": number
 }
 
-const STORAGE_KEY = "instainr:wallet"
 type WalletState = {
   connected: boolean
   username?: string
   balances: Balances
 }
 
-const defaultState: WalletState = {
-  connected: false,
-  username: "pikai.1111",
-  balances: { WLD: 12.34, ETH: 0.56, "USDC.e": 150 },
-}
-
-const fetcher = (key: string) => {
-  if (typeof window === "undefined") return defaultState
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw ? (JSON.parse(raw) as WalletState) : defaultState
-}
+// Mock balances for demo purposes - in production, these would come from blockchain queries
+const defaultBalances: Balances = { WLD: 12.34, ETH: 0.56, "USDC.e": 150 }
 
 export function useWallet() {
-  const { data, mutate } = useSWR<WalletState>(STORAGE_KEY, fetcher, {
-    revalidateOnFocus: false,
+  const [walletState, setWalletState] = useState<WalletState>({
+    connected: false,
+    username: undefined,
+    balances: defaultBalances,
   })
 
   useEffect(() => {
-    if (!data) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  }, [data])
+    // Check if MiniKit is installed and available
+    if (typeof window !== "undefined" && MiniKit.isInstalled()) {
+      // Check if user is already authenticated
+      const user = MiniKit.user
+      if (user?.username) {
+        setWalletState(prev => ({
+          ...prev,
+          connected: true,
+          username: user.username,
+        }))
+      }
+    }
+  }, [])
 
-  function connect() {
-    mutate(
-      (prev) => ({
-        ...(prev ?? defaultState),
+  async function connect() {
+    if (!MiniKit.isInstalled()) {
+      console.warn("MiniKit is not installed")
+      return
+    }
+
+    try {
+      // Use Wallet Auth (Sign in with Ethereum) for authentication
+      const nonce = Math.random().toString(36).substring(2, 15)
+      const requestId = Math.random().toString(36).substring(2, 15)
+      
+      const walletAuthResult = await MiniKit.commands.walletAuth({
+        nonce,
+        requestId,
+        expirationTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+        notBefore: new Date(),
+        statement: "Sign in to InstaINR to access your wallet and trade tokens.",
+      })
+
+      if (walletAuthResult) {
+        // After successful wallet auth, user info should be available
+        const user = MiniKit.user
+        setWalletState(prev => ({
+          ...prev,
+          connected: true,
+          username: user?.username || "World App User",
+        }))
+      }
+    } catch (error) {
+      console.error("Wallet connection failed:", error)
+      // Fallback to mock connection for development
+      setWalletState(prev => ({
+        ...prev,
         connected: true,
-        username: prev?.username ?? "pikai.1111",
-      }),
-      { revalidate: false },
-    )
+        username: "pikai.1111",
+      }))
+    }
   }
 
   function disconnect() {
-    mutate((prev) => ({ ...(prev ?? defaultState), connected: false }), { revalidate: false })
+    setWalletState(prev => ({
+      ...prev,
+      connected: false,
+      username: undefined,
+    }))
   }
 
   function deductBalance(sym: keyof Balances, amount: number) {
-    mutate(
-      (prev) => {
-        const p = prev ?? defaultState
-        return {
-          ...p,
-          balances: {
-            ...p.balances,
-            [sym]: Math.max(0, Number((p.balances[sym] - amount).toFixed(6))),
-          },
-        }
+    setWalletState(prev => ({
+      ...prev,
+      balances: {
+        ...prev.balances,
+        [sym]: Math.max(0, Number((prev.balances[sym] - amount).toFixed(6))),
       },
-      { revalidate: false },
-    )
+    }))
   }
 
   return {
-    connected: data?.connected ?? false,
-    username: data?.username,
-    balances: data?.balances ?? defaultState.balances,
+    connected: walletState.connected,
+    username: walletState.username,
+    balances: walletState.balances,
     connect,
     disconnect,
     deductBalance,

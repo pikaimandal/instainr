@@ -19,17 +19,44 @@ type WalletState = {
 const defaultBalances: Balances = { WLD: 12.34, ETH: 0.56, "USDC.e": 150 }
 
 export function useWallet() {
-  const [walletState, setWalletState] = useState<WalletState>({
-    connected: false,
-    username: undefined,
-    balances: defaultBalances,
+  const [walletState, setWalletState] = useState<WalletState>(() => {
+    // Initialize from localStorage if available
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem('instainr-wallet-state')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          return {
+            ...parsed,
+            balances: defaultBalances, // Always use fresh balances
+          }
+        } catch (e) {
+          console.error('Failed to parse stored wallet state:', e)
+        }
+      }
+    }
+    return {
+      connected: false,
+      username: undefined,
+      balances: defaultBalances,
+    }
   })
+
+  // Persist wallet state to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem('instainr-wallet-state', JSON.stringify({
+        connected: walletState.connected,
+        username: walletState.username,
+      }))
+    }
+  }, [walletState.connected, walletState.username])
 
   useEffect(() => {
     // Check if MiniKit is installed and user is already authenticated
     if (typeof window !== "undefined" && MiniKit.isInstalled()) {
       const user = MiniKit.user
-      if (user?.username) {
+      if (user?.username && !walletState.connected) {
         setWalletState(prev => ({
           ...prev,
           connected: true,
@@ -113,6 +140,11 @@ export function useWallet() {
       username: undefined,
       balances: defaultBalances,
     })
+    
+    // Clear localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem('instainr-wallet-state')
+    }
     
     // Clear any MiniKit session data if available
     if (MiniKit.isInstalled()) {

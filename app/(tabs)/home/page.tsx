@@ -25,8 +25,10 @@ export default function HomePage() {
   }, [connected, router])
 
   const handleLogout = () => {
+    // Disconnect and immediately redirect
     disconnect()
-    router.replace("/") // Immediate redirect to splash
+    // Force immediate navigation without waiting for state updates
+    window.location.href = "/"
   }
 
   return (

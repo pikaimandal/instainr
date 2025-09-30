@@ -8,7 +8,6 @@ import SplashScreen from "@/components/splash-screen"
 export default function HomePage() {
   const router = useRouter()
   const { connected } = useWallet()
-  const [showSplash, setShowSplash] = useState(true)
 
   useEffect(() => {
     if (connected) {
@@ -17,12 +16,11 @@ export default function HomePage() {
   }, [connected, router])
 
   const handleConnectionSuccess = () => {
-    setShowSplash(false)
     router.replace("/home")
   }
 
-  // Only show splash screen if not connected
-  if (!connected && showSplash) {
+  // Show splash screen if not connected
+  if (!connected) {
     return <SplashScreen onSuccess={handleConnectionSuccess} />
   }
 

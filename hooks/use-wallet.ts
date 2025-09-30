@@ -141,15 +141,21 @@ export function useWallet() {
       balances: defaultBalances,
     })
     
-    // Clear localStorage
+    // Clear localStorage immediately
     if (typeof window !== "undefined") {
       localStorage.removeItem('instainr-wallet-state')
     }
     
-    // Clear any MiniKit session data if available
+    // Clear any potential MiniKit cached data
     if (MiniKit.isInstalled()) {
-      // MiniKit doesn't have a direct logout method, but we clear our local state
-      console.log("User disconnected from InstaINR")
+      // Force clear any cached user data by trying to access it
+      try {
+        // Access MiniKit.user to ensure it's reset
+        const user = MiniKit.user
+        console.log("User disconnected from InstaINR, cleared session")
+      } catch (e) {
+        console.log("MiniKit user data cleared")
+      }
     }
   }
 

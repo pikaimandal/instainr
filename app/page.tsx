@@ -31,15 +31,6 @@ export default function SplashPage() {
     }
   }, [connected, router])
 
-  // Don't render splash content if already connected to prevent flickering
-  if (connected) {
-    return (
-      <main className="min-h-dvh flex flex-col items-center justify-center gap-6 px-6 text-center">
-        <p className="text-xs text-muted-foreground">Redirecting...</p>
-      </main>
-    )
-  }
-
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center gap-6 px-6 text-center">
       <div className="flex flex-col items-center gap-3">
@@ -58,7 +49,7 @@ export default function SplashPage() {
               setError(null)
               try {
                 await connect()
-                router.replace("/home")
+                // Navigation happens automatically via useEffect when connected state changes
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Connection failed")
                 setIsConnecting(false)

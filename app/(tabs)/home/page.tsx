@@ -29,17 +29,6 @@ export default function HomePage() {
     router.replace("/") // Immediate redirect to splash
   }
 
-  // Don't render home content if not connected to prevent flickering
-  if (!connected) {
-    return (
-      <main className="mx-auto max-w-md px-4 pt-4 pb-20">
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <p className="text-xs text-muted-foreground">Redirecting...</p>
-        </div>
-      </main>
-    )
-  }
-
   return (
     <main className="mx-auto max-w-md px-4 pt-4 pb-20">
       {/* Top bar */}

@@ -69,9 +69,17 @@ async function makeAlchemyCall(method: string, params: any[]): Promise<any> {
 async function fetchNativeETHBalance(walletAddress: string): Promise<string> {
   try {
     const balance = await makeAlchemyCall('eth_getBalance', [walletAddress, 'latest'])
-    const formattedBalance = formatUnits(BigInt(balance), 18)
+    const balanceBigInt = BigInt(balance)
+    
+    let formattedBalance: string
+    try {
+      formattedBalance = formatUnits(balanceBigInt, 18)
+    } catch (error) {
+      console.error('formatUnits failed for ETH, using manual calculation:', error)
+      formattedBalance = (Number(balanceBigInt) / Math.pow(10, 18)).toString()
+    }
+    
     const finalBalance = parseFloat(formattedBalance).toFixed(6)
-    console.log(`✅ ETH: ${finalBalance}`)
     return finalBalance
   } catch (error) {
     console.error('❌ ETH balance error:', error)
@@ -104,13 +112,51 @@ async function fetchERC20Balances(walletAddress: string): Promise<{
         const contractAddress = token.contractAddress?.toLowerCase()
         
         if (contractAddress === TOKEN_CONTRACTS.WLD.toLowerCase() && token.tokenBalance && token.tokenBalance !== '0x0') {
-          const balance = formatUnits(BigInt(token.tokenBalance), TOKEN_DECIMALS.WLD)
-          balances.WLD = parseFloat(balance).toFixed(6)
-          console.log(`✅ WLD: ${balances.WLD}`)
+          try {
+            const balanceBigInt = BigInt(token.tokenBalance)
+            const balance = formatUnits(balanceBigInt, TOKEN_DECIMALS.WLD)
+            balances.WLD = parseFloat(balance).toFixed(6)
+            
+            // Additional verification - manual calculation as fallback
+            const manualBalance = (Number(balanceBigInt) / Math.pow(10, TOKEN_DECIMALS.WLD)).toFixed(6)
+            
+            // Use manual calculation if viem returns 0 but manual calculation shows a balance
+            if (balances.WLD === '0.000000' && parseFloat(manualBalance) > 0) {
+              balances.WLD = manualBalance
+            }
+          } catch (error) {
+            console.error('WLD balance parsing error:', error)
+            // Fallback to manual calculation
+            try {
+              const balanceBigInt = BigInt(token.tokenBalance)
+              balances.WLD = (Number(balanceBigInt) / Math.pow(10, TOKEN_DECIMALS.WLD)).toFixed(6)
+            } catch (fallbackError) {
+              console.error('WLD manual fallback failed:', fallbackError)
+            }
+          }
         } else if (contractAddress === TOKEN_CONTRACTS['USDC.e'].toLowerCase() && token.tokenBalance && token.tokenBalance !== '0x0') {
-          const balance = formatUnits(BigInt(token.tokenBalance), TOKEN_DECIMALS['USDC.e'])
-          balances['USDC.e'] = parseFloat(balance).toFixed(6)
-          console.log(`✅ USDC.e: ${balances['USDC.e']}`)
+          try {
+            const balanceBigInt = BigInt(token.tokenBalance)
+            const balance = formatUnits(balanceBigInt, TOKEN_DECIMALS['USDC.e'])
+            balances['USDC.e'] = parseFloat(balance).toFixed(6)
+            
+            // Additional verification - manual calculation as fallback
+            const manualBalance = (Number(balanceBigInt) / Math.pow(10, TOKEN_DECIMALS['USDC.e'])).toFixed(6)
+            
+            // Use manual calculation if viem returns 0 but manual calculation shows a balance
+            if (balances['USDC.e'] === '0.000000' && parseFloat(manualBalance) > 0) {
+              balances['USDC.e'] = manualBalance
+            }
+          } catch (error) {
+            console.error('USDC.e balance parsing error:', error)
+            // Fallback to manual calculation
+            try {
+              const balanceBigInt = BigInt(token.tokenBalance)
+              balances['USDC.e'] = (Number(balanceBigInt) / Math.pow(10, TOKEN_DECIMALS['USDC.e'])).toFixed(6)
+            } catch (fallbackError) {
+              console.error('USDC.e manual fallback failed:', fallbackError)
+            }
+          }
         }
       }
     }
@@ -135,7 +181,6 @@ export async function fetchAllTokenBalances(walletAddress: string): Promise<{
   'USDC.e': string
   ETH: string
 }> {
-  console.log('💰 Fetching balances for:', walletAddress)
   
   try {
     const [ethBalance, erc20Balances] = await Promise.all([
@@ -149,7 +194,6 @@ export async function fetchAllTokenBalances(walletAddress: string): Promise<{
       ETH: ethBalance,
     }
 
-    console.log('✅ Balance fetch complete:', result)
     return result
   } catch (error) {
     console.error('❌ Balance fetch failed:', error)

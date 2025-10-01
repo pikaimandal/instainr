@@ -13,6 +13,7 @@ type Balances = {
 type WalletState = {
   connected: boolean
   username?: string
+  walletAddress?: string
   balances: Balances
   isLoadingBalances: boolean
   balanceError?: string
@@ -43,6 +44,7 @@ export function useWallet() {
     return {
       connected: false,
       username: undefined,
+      walletAddress: undefined,
       balances: defaultBalances,
       isLoadingBalances: false,
       balanceError: undefined,
@@ -55,93 +57,29 @@ export function useWallet() {
       localStorage.setItem('instainr-wallet-state', JSON.stringify({
         connected: walletState.connected,
         username: walletState.username,
+        walletAddress: walletState.walletAddress,
       }))
     }
-  }, [walletState.connected, walletState.username])
+  }, [walletState.connected, walletState.username, walletState.walletAddress])
 
   // Function to fetch real token balances
   async function fetchBalances() {
-    console.log('=== STARTING BALANCE FETCH ====')
-    console.log('🔄 Starting balance fetch...')
-    console.log('MiniKit installed:', MiniKit.isInstalled())
-    console.log('Wallet connected:', walletState.connected)
-    
-    if (!walletState.connected || !MiniKit.isInstalled()) {
-      console.log('❌ Skipping: not connected or MiniKit not installed')
+    if (!walletState.connected || !walletState.walletAddress) {
       return
     }
 
     try {
-      // Inspect MiniKit state thoroughly
-      console.log('🔍 MiniKit.isInstalled():', MiniKit.isInstalled())
-      console.log('🔍 MiniKit.user:', MiniKit.user)
-      console.log('🔍 MiniKit keys:', Object.keys(MiniKit))
-      
-      // Try multiple ways to get wallet address
-      let walletAddress: string | undefined
-      
-      // Method 1: Direct access
-      try {
-        walletAddress = (MiniKit as any).walletAddress
-        console.log('💰 Method 1 - MiniKit.walletAddress:', walletAddress)
-      } catch (e) {
-        console.log('❌ Method 1 failed:', e)
+      if (!isValidAddress(walletState.walletAddress)) {
+        throw new Error(`Invalid wallet address: ${walletState.walletAddress}`)
       }
-      
-      // Method 2: Via window
-      if (!walletAddress && typeof window !== 'undefined') {
-        try {
-          walletAddress = (window as any).MiniKit?.walletAddress
-          console.log('💰 Method 2 - window.MiniKit.walletAddress:', walletAddress)
-        } catch (e) {
-          console.log('❌ Method 2 failed:', e)
-        }
-      }
-      
-      // Method 3: Check if it's in user object or other properties
-      if (!walletAddress) {
-        const miniKitAny = MiniKit as any
-        console.log('🔍 Full MiniKit object keys:', Object.keys(miniKitAny))
-        console.log('🔍 MiniKit.user keys:', MiniKit.user ? Object.keys(MiniKit.user) : 'no user')
-        
-        // Check various possible locations
-        if (miniKitAny.user?.address) {
-          walletAddress = miniKitAny.user.address
-          console.log('💰 Method 3a - MiniKit.user.address:', walletAddress)
-        } else if (miniKitAny.address) {
-          walletAddress = miniKitAny.address
-          console.log('💰 Method 3b - MiniKit.address:', walletAddress)
-        } else if (miniKitAny.wallet?.address) {
-          walletAddress = miniKitAny.wallet.address
-          console.log('💰 Method 3c - MiniKit.wallet.address:', walletAddress)
-        }
-      }
-      
-      console.log('💰 Final wallet address result:', walletAddress)
-      
-      if (!walletAddress) {
-        console.error('❌ CRITICAL: No wallet address found after trying all methods')
-        console.error('❌ This means MiniKit.walletAddress is not available yet or auth failed')
-        throw new Error('Wallet address not available - please reconnect wallet')
-      }
-      
-      if (!isValidAddress(walletAddress)) {
-        console.error('❌ Invalid address format:', walletAddress)
-        throw new Error(`Invalid wallet address: ${walletAddress}`)
-      }
-      
-      console.log('✅ Using wallet address:', walletAddress)
 
-      console.log('🔄 Setting loading state to true')
       setWalletState(prev => ({
         ...prev,
         isLoadingBalances: true,
         balanceError: undefined,
       }))
 
-      console.log('🌐 Calling fetchAllTokenBalances with address:', walletAddress)
-      const balanceStrings = await fetchAllTokenBalances(walletAddress)
-      console.log('✅ Received balance strings from blockchain:', balanceStrings)
+      const balanceStrings = await fetchAllTokenBalances(walletState.walletAddress)
       
       // Convert string balances to numbers
       const balances: Balances = {
@@ -150,9 +88,6 @@ export function useWallet() {
         "USDC.e": parseFloat(balanceStrings["USDC.e"]),
       }
 
-      console.log('✅ Converted balances to numbers:', balances)
-      console.log('🎉 Balance fetch completed successfully!')
-
       setWalletState(prev => ({
         ...prev,
         balances,
@@ -160,26 +95,13 @@ export function useWallet() {
         balanceError: undefined,
       }))
     } catch (error) {
-      console.error('❌ BALANCE FETCH ERROR:', error)
-      console.error('❌ Error type:', typeof error)
-      console.error('❌ Error constructor:', error?.constructor?.name)
-      
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch balances'
-      console.error('❌ Final error message:', errorMessage)
       
-      // Log the full error stack if available
-      if (error instanceof Error && error.stack) {
-        console.error('❌ Error stack:', error.stack)
-      }
-      
-      console.log('🔄 Setting error state and stopping loading')
       setWalletState(prev => ({
         ...prev,
         isLoadingBalances: false,
         balanceError: errorMessage,
       }))
-      
-      console.log('=== BALANCE FETCH FAILED ====')
     }
   }
 
@@ -187,34 +109,25 @@ export function useWallet() {
     // Check if MiniKit is installed and user is already authenticated
     if (typeof window !== "undefined" && MiniKit.isInstalled()) {
       const user = MiniKit.user
-      if (user?.username && !walletState.connected) {
-        console.log('🔍 Auto-connecting existing user:', user.username)
-        console.log('🔍 Checking if walletAddress is available for auto-connect...')
-        const autoWalletAddress = (MiniKit as any).walletAddress
-        console.log('💰 Auto-connect walletAddress:', autoWalletAddress)
-        
+      if (user?.username && !walletState.connected && walletState.walletAddress) {
         setWalletState(prev => ({
           ...prev,
           connected: true,
           username: user.username,
         }))
         
-        // Fetch balances after auto-connection with longer delay
-        console.log('✅ Auto-connected, fetching balances in 1 second...')
-        setTimeout(() => fetchBalances(), 1000)
+        // Fetch balances after auto-connection
+        setTimeout(() => fetchBalances(), 500)
       }
     }
   }, [])
 
   // Auto-refresh balances periodically when connected
   useEffect(() => {
-    if (!walletState.connected) return
+    if (!walletState.connected || !walletState.walletAddress) return
 
     // Initial balance fetch (if not already loading)
     if (!walletState.isLoadingBalances && walletState.balances.WLD === 0 && walletState.balances.ETH === 0 && walletState.balances["USDC.e"] === 0) {
-      console.log('🔄 Triggering initial balance fetch from useEffect...')
-      const hasWalletAddress = !!(MiniKit as any).walletAddress
-      console.log('🔍 Initial fetch - wallet address available:', hasWalletAddress)
       fetchBalances()
     }
 
@@ -226,7 +139,7 @@ export function useWallet() {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [walletState.connected])
+  }, [walletState.connected, walletState.walletAddress])
 
   async function connect() {
     if (!MiniKit.isInstalled()) {
@@ -251,7 +164,11 @@ export function useWallet() {
         throw new Error('Wallet authentication was rejected or failed')
       }
 
-      console.log('🔐 Wallet auth successful')
+      // Extract wallet address from the authentication payload
+      const walletAddress = finalPayload.address
+      if (!walletAddress || !isValidAddress(walletAddress)) {
+        throw new Error('Invalid wallet address received from authentication')
+      }
 
       // Verify the SIWE message in backend
       const response = await fetch('/api/complete-siwe', {
@@ -270,11 +187,8 @@ export function useWallet() {
       if (verificationResult.status === 'error' || !verificationResult.isValid) {
         throw new Error('Failed to verify wallet authentication')
       }
-      
-      console.log('✅ Wallet authentication verified successfully')
 
-      // Now get user info from MiniKit after successful authentication
-      // Sometimes the user info takes a moment to be available after authentication
+      // Get user info from MiniKit after successful authentication
       let attempts = 0
       let user = MiniKit.user
       
@@ -285,37 +199,15 @@ export function useWallet() {
       }
       
       if (user?.username) {
-        console.log('👤 Connected! Username:', user.username)
         setWalletState(prev => ({
           ...prev,
           connected: true,
           username: user.username,
+          walletAddress: walletAddress,
         }))
         
-        // Wait for MiniKit.walletAddress to become available
-        console.log('⏰ Waiting for MiniKit.walletAddress to become available...')
-        let addressAttempts = 0
-        const waitForAddress = async () => {
-          while (addressAttempts < 20) { // Try for up to 2 seconds
-            const testAddress = (MiniKit as any).walletAddress
-            console.log(`🔍 Attempt ${addressAttempts + 1}: MiniKit.walletAddress =`, testAddress)
-            
-            if (testAddress) {
-              console.log('✅ Wallet address is now available! Fetching balances...')
-              setTimeout(() => fetchBalances(), 100)
-              return
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, 100))
-            addressAttempts++
-          }
-          
-          console.error('❌ Timeout: MiniKit.walletAddress never became available')
-          console.log('🔄 Trying to fetch balances anyway (will likely fail)...')
-          setTimeout(() => fetchBalances(), 100)
-        }
-        
-        waitForAddress()
+        // Fetch balances after successful connection
+        setTimeout(() => fetchBalances(), 100)
       } else {
         throw new Error("Failed to retrieve user information after authentication")
       }
@@ -330,6 +222,7 @@ export function useWallet() {
     setWalletState({
       connected: false,
       username: undefined,
+      walletAddress: undefined,
       balances: defaultBalances,
       isLoadingBalances: false,
       balanceError: undefined,
@@ -338,18 +231,6 @@ export function useWallet() {
     // Clear localStorage immediately
     if (typeof window !== "undefined") {
       localStorage.removeItem('instainr-wallet-state')
-    }
-    
-    // Clear any potential MiniKit cached data
-    if (MiniKit.isInstalled()) {
-      // Force clear any cached user data by trying to access it
-      try {
-        // Access MiniKit.user to ensure it's reset
-        const user = MiniKit.user
-        console.log("User disconnected from InstaINR, cleared session")
-      } catch (e) {
-        console.log("MiniKit user data cleared")
-      }
     }
   }
 
@@ -368,6 +249,7 @@ export function useWallet() {
   return {
     connected: walletState.connected,
     username: walletState.username,
+    walletAddress: walletState.walletAddress,
     balances: walletState.balances,
     isLoadingBalances: walletState.isLoadingBalances,
     balanceError: walletState.balanceError,

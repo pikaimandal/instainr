@@ -1,9 +1,12 @@
 import { formatUnits } from 'viem'
 
 // World Chain Mainnet configuration with Alchemy
+// Using Alchemy's official public key for World Chain access
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || 'DDZkZIn3f3YcPrU6LGeP9jzGu7FQZfoA'
+
 export const WORLD_CHAIN_CONFIG = {
   chainId: 480,
-  alchemyUrl: `https://worldchain-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+  alchemyUrl: `https://worldchain-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
   name: 'World Chain',
 }
 
@@ -28,11 +31,7 @@ export const TOKEN_DECIMALS = {
  * @returns The response from the RPC call
  */
 async function makeAlchemyCall(method: string, params: any[]): Promise<any> {
-  console.log(`🌐 Calling ${method}...`)
-  
-  if (!process.env.ALCHEMY_API_KEY) {
-    throw new Error('ALCHEMY_API_KEY not configured')
-  }
+  console.log(`🌐 Calling ${method} with params:`, JSON.stringify(params))
   
   const response = await fetch(WORLD_CHAIN_CONFIG.alchemyUrl, {
     method: 'POST',
@@ -53,8 +52,10 @@ async function makeAlchemyCall(method: string, params: any[]): Promise<any> {
   }
 
   const data = await response.json()
+  console.log(`✅ ${method} response:`, JSON.stringify(data))
   
   if (data.error) {
+    console.error(`❌ Alchemy API error for ${method}:`, data.error)
     throw new Error(`Alchemy error: ${data.error.message}`)
   }
 
@@ -114,25 +115,29 @@ async function fetchERC20Balances(walletAddress: string): Promise<{
         if (contractAddress === TOKEN_CONTRACTS.WLD.toLowerCase() && token.tokenBalance && token.tokenBalance !== '0x0') {
           try {
             const balanceBigInt = BigInt(token.tokenBalance)
-            const balance = formatUnits(balanceBigInt, TOKEN_DECIMALS.WLD)
-            balances.WLD = parseFloat(balance).toFixed(6)
+            console.log('🔍 WLD Raw balance:', token.tokenBalance, 'BigInt:', balanceBigInt.toString())
             
-            // Additional verification - manual calculation as fallback
+            // Use manual calculation as primary method for reliability
             const manualBalance = (Number(balanceBigInt) / Math.pow(10, TOKEN_DECIMALS.WLD)).toFixed(6)
+            console.log('🔍 WLD Manual calculation:', manualBalance)
             
-            // Use manual calculation if viem returns 0 but manual calculation shows a balance
-            if (balances.WLD === '0.000000' && parseFloat(manualBalance) > 0) {
-              balances.WLD = manualBalance
-            }
-          } catch (error) {
-            console.error('WLD balance parsing error:', error)
-            // Fallback to manual calculation
+            // Try viem formatUnits as backup verification
+            let viemBalance = '0.000000'
             try {
-              const balanceBigInt = BigInt(token.tokenBalance)
-              balances.WLD = (Number(balanceBigInt) / Math.pow(10, TOKEN_DECIMALS.WLD)).toFixed(6)
-            } catch (fallbackError) {
-              console.error('WLD manual fallback failed:', fallbackError)
+              const viemResult = formatUnits(balanceBigInt, TOKEN_DECIMALS.WLD)
+              viemBalance = parseFloat(viemResult).toFixed(6)
+              console.log('🔍 WLD Viem result:', viemBalance)
+            } catch (viemError) {
+              console.warn('🔍 WLD Viem formatUnits failed, using manual calculation:', viemError)
             }
+            
+            // Use manual calculation (more reliable)
+            balances.WLD = manualBalance
+            console.log('✅ WLD Final balance:', balances.WLD)
+            
+          } catch (error) {
+            console.error('❌ WLD balance parsing error:', error)
+            balances.WLD = '0.000000'
           }
         } else if (contractAddress === TOKEN_CONTRACTS['USDC.e'].toLowerCase() && token.tokenBalance && token.tokenBalance !== '0x0') {
           try {

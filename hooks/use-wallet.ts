@@ -73,9 +73,6 @@ export function useWallet() {
         throw new Error(`Invalid wallet address: ${walletState.walletAddress}`)
       }
 
-      // Temporary debug log
-      console.log('🔍 DEBUG: Fetching balances for address:', walletState.walletAddress)
-
       setWalletState(prev => ({
         ...prev,
         isLoadingBalances: true,

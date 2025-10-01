@@ -28,7 +28,12 @@ export function BalancesCard({ prices }: { prices: Prices }) {
     <Card>
       <CardHeader className="py-3">
         <CardTitle className="text-base flex items-center justify-between">
-          <span>Your Wallet</span>
+          <span>
+            {walletAddress 
+              ? `Your Wallet: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+              : 'Your Wallet'
+            }
+          </span>
           <div className="flex items-center gap-2">
             {isLoadingBalances && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -53,14 +58,6 @@ export function BalancesCard({ prices }: { prices: Prices }) {
             <AlertCircle className="h-4 w-4 text-orange-500" />
             <span className="text-xs text-orange-700">
               Failed to load balances. Showing cached data.
-            </span>
-          </div>
-        )}
-        {/* Temporary debug display */}
-        {walletAddress && (
-          <div className="flex items-center gap-2 p-2 mb-3 bg-blue-50 border border-blue-200 rounded-md">
-            <span className="text-xs text-blue-700">
-              Wallet: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
             </span>
           </div>
         )}

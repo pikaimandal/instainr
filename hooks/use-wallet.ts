@@ -328,6 +328,32 @@ export function useWallet() {
     }))
   }
 
+  // Debug function to test balance fetching with a specific address
+  async function debugFetchBalances(testAddress?: string) {
+    console.log('🧪 DEBUG: Starting balance fetch test')
+    const addressToTest = testAddress || walletState.walletAddress || '0x1599459dff7a3da0922de1aa05383aa6ca0379cb'
+    
+    try {
+      console.log('🧪 Testing with address:', addressToTest)
+      const balanceStrings = await fetchAllTokenBalances(addressToTest)
+      console.log('🧪 DEBUG: Raw balance strings:', balanceStrings)
+      
+      const balances = {
+        WLD: parseFloat(balanceStrings.WLD),
+        ETH: parseFloat(balanceStrings.ETH),
+        "USDC.e": parseFloat(balanceStrings["USDC.e"]),
+      }
+      
+      console.log('🧪 DEBUG: Converted balances:', balances)
+      console.log('🧪 DEBUG: Test completed successfully!')
+      
+      return balances
+    } catch (error) {
+      console.error('🧪 DEBUG: Test failed:', error)
+      throw error
+    }
+  }
+
   return {
     connected: walletState.connected,
     username: walletState.username,
@@ -339,5 +365,6 @@ export function useWallet() {
     disconnect,
     deductBalance,
     refreshBalances: fetchBalances,
+    debugFetchBalances, // Add debug function for testing
   }
 }

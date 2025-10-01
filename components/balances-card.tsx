@@ -15,7 +15,7 @@ type Prices =
   | undefined
 
 export function BalancesCard({ prices }: { prices: Prices }) {
-  const { balances, isLoadingBalances, balanceError, refreshBalances } = useWallet()
+  const { balances, isLoadingBalances, balanceError, refreshBalances, debugFetchBalances } = useWallet()
   const rows = [
     { sym: "WLD", amt: balances.WLD, price: prices?.WLD ?? 0 },
     { sym: "ETH", amt: balances.ETH, price: prices?.ETH ?? 0 },
@@ -23,6 +23,11 @@ export function BalancesCard({ prices }: { prices: Prices }) {
   ]
 
   const totalInr = rows.reduce((sum, r) => sum + r.amt * r.price, 0)
+
+  // Expose debug functions globally for testing in World App console
+  if (typeof window !== 'undefined' && debugFetchBalances) {
+    (window as any).debugFetchBalances = debugFetchBalances
+  }
 
   return (
     <Card>

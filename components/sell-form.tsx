@@ -162,6 +162,7 @@ export function SellForm() {
             const id = nextTxId()
             addTransaction({
               id,
+              reference: paymentData.referenceId,
               token,
               amountToken: Number(amount),
               inrPerUnit: pricePerUnit,

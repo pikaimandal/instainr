@@ -90,6 +90,10 @@ export default function HistoryPage() {
                         <span className="font-mono">{t.id}</span>
                       </div>
                       <div>
+                        <span className="text-muted-foreground">Reference: </span>
+                        <span className="font-mono">{t.reference || t.id}</span>
+                      </div>
+                      <div>
                         <span className="text-muted-foreground">Date: </span>
                         <span>{new Date(t.createdAt).toLocaleString()}</span>
                       </div>
@@ -117,31 +121,27 @@ export default function HistoryPage() {
                         <span className="text-muted-foreground">Withdrawal method: </span>
                         <span>{t.methodSummary}</span>
                       </div>
-                      {t.status === "Rejected" && t.rejectReason && (
-                        <div className="text-destructive">
-                          Reason: {t.rejectReason} If you need help, contact{" "}
-                          <a className="underline" href="mailto:support@instainr.app">
-                            support@instainr.app
-                          </a>
-                          .
-                        </div>
-                      )}
-                      <div className="pt-1">
+                      <div>
+                        <span className="text-muted-foreground">Explorer link: </span>
                         {t.explorerUrl ? (
                           <a
                             href={t.explorerUrl}
-                            className="text-primary underline text-sm"
+                            className="text-primary underline cursor-pointer"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            View on Explorer
+                            Click to View
                           </a>
                         ) : (
-                          <Button variant="ghost" size="sm" disabled>
-                            Explorer link pending
-                          </Button>
+                          <span>Click to View</span>
                         )}
                       </div>
+                      {t.status === "Rejected" && t.rejectReason && (
+                        <div>
+                          <span className="text-muted-foreground">Reason: </span>
+                          <span className="text-destructive">{t.rejectReason}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>

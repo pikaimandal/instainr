@@ -6,6 +6,7 @@ type TxStatus = "Processing" | "Completed" | "Rejected"
 
 export type Tx = {
   id: string
+  reference?: string
   token: "WLD" | "ETH" | "USDC.e"
   amountToken: number
   inrPerUnit: number

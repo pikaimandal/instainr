@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { MiniKit } from "@worldcoin/minikit-js"
+import { fetchAllTokenBalances, isValidAddress } from "@/lib/blockchain"
 
 type Balances = {
   WLD: number
@@ -13,10 +14,12 @@ type WalletState = {
   connected: boolean
   username?: string
   balances: Balances
+  isLoadingBalances: boolean
+  balanceError?: string
 }
 
-// Mock balances for demo purposes - in production, these would come from blockchain queries
-const defaultBalances: Balances = { WLD: 12.34, ETH: 0.56, "USDC.e": 150 }
+// Default balances while loading or on error
+const defaultBalances: Balances = { WLD: 0, ETH: 0, "USDC.e": 0 }
 
 export function useWallet() {
   const [walletState, setWalletState] = useState<WalletState>(() => {
@@ -29,6 +32,8 @@ export function useWallet() {
           return {
             ...parsed,
             balances: defaultBalances, // Always use fresh balances
+            isLoadingBalances: false,
+            balanceError: undefined,
           }
         } catch (e) {
           console.error('Failed to parse stored wallet state:', e)
@@ -39,6 +44,8 @@ export function useWallet() {
       connected: false,
       username: undefined,
       balances: defaultBalances,
+      isLoadingBalances: false,
+      balanceError: undefined,
     }
   })
 
@@ -52,6 +59,50 @@ export function useWallet() {
     }
   }, [walletState.connected, walletState.username])
 
+  // Function to fetch real token balances
+  async function fetchBalances() {
+    if (!walletState.connected || !MiniKit.isInstalled()) {
+      return
+    }
+
+    try {
+      const walletAddress = (MiniKit as any).walletAddress
+      
+      if (!walletAddress || !isValidAddress(walletAddress)) {
+        throw new Error('Invalid wallet address')
+      }
+
+      setWalletState(prev => ({
+        ...prev,
+        isLoadingBalances: true,
+        balanceError: undefined,
+      }))
+
+      const balanceStrings = await fetchAllTokenBalances(walletAddress)
+      
+      // Convert string balances to numbers
+      const balances: Balances = {
+        WLD: parseFloat(balanceStrings.WLD),
+        ETH: parseFloat(balanceStrings.ETH),
+        "USDC.e": parseFloat(balanceStrings["USDC.e"]),
+      }
+
+      setWalletState(prev => ({
+        ...prev,
+        balances,
+        isLoadingBalances: false,
+        balanceError: undefined,
+      }))
+    } catch (error) {
+      console.error('Error fetching balances:', error)
+      setWalletState(prev => ({
+        ...prev,
+        isLoadingBalances: false,
+        balanceError: error instanceof Error ? error.message : 'Failed to fetch balances',
+      }))
+    }
+  }
+
   useEffect(() => {
     // Check if MiniKit is installed and user is already authenticated
     if (typeof window !== "undefined" && MiniKit.isInstalled()) {
@@ -62,9 +113,31 @@ export function useWallet() {
           connected: true,
           username: user.username,
         }))
+        
+        // Fetch balances for already authenticated user
+        setTimeout(() => fetchBalances(), 500)
       }
     }
   }, [])
+
+  // Auto-refresh balances periodically when connected
+  useEffect(() => {
+    if (!walletState.connected) return
+
+    // Initial balance fetch (if not already loading)
+    if (!walletState.isLoadingBalances && walletState.balances.WLD === 0 && walletState.balances.ETH === 0 && walletState.balances["USDC.e"] === 0) {
+      fetchBalances()
+    }
+
+    // Set up periodic balance refresh (every 30 seconds)
+    const interval = setInterval(() => {
+      if (!walletState.isLoadingBalances) {
+        fetchBalances()
+      }
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [walletState.connected])
 
   async function connect() {
     if (!MiniKit.isInstalled()) {
@@ -124,6 +197,10 @@ export function useWallet() {
           connected: true,
           username: user.username,
         }))
+        
+        // Fetch real balances after successful connection
+        // Use setTimeout to ensure state is updated first
+        setTimeout(() => fetchBalances(), 100)
       } else {
         throw new Error("Failed to retrieve user information after authentication")
       }
@@ -139,6 +216,8 @@ export function useWallet() {
       connected: false,
       username: undefined,
       balances: defaultBalances,
+      isLoadingBalances: false,
+      balanceError: undefined,
     })
     
     // Clear localStorage immediately
@@ -173,8 +252,11 @@ export function useWallet() {
     connected: walletState.connected,
     username: walletState.username,
     balances: walletState.balances,
+    isLoadingBalances: walletState.isLoadingBalances,
+    balanceError: walletState.balanceError,
     connect,
     disconnect,
     deductBalance,
+    refreshBalances: fetchBalances,
   }
 }

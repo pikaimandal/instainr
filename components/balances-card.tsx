@@ -3,6 +3,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useWallet } from "@/hooks/use-wallet"
 import { formatInr } from "@/lib/format"
+import { Loader2, RefreshCw, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 type Prices =
   | {
@@ -13,7 +15,7 @@ type Prices =
   | undefined
 
 export function BalancesCard({ prices }: { prices: Prices }) {
-  const { balances } = useWallet()
+  const { balances, isLoadingBalances, balanceError, refreshBalances } = useWallet()
   const rows = [
     { sym: "WLD", amt: balances.WLD, price: prices?.WLD ?? 0 },
     { sym: "ETH", amt: balances.ETH, price: prices?.ETH ?? 0 },
@@ -25,12 +27,44 @@ export function BalancesCard({ prices }: { prices: Prices }) {
   return (
     <Card>
       <CardHeader className="py-3">
-        <CardTitle className="text-base">Your Wallet</CardTitle>
+        <CardTitle className="text-base flex items-center justify-between">
+          <span>Your Wallet</span>
+          <div className="flex items-center gap-2">
+            {isLoadingBalances && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+            {balanceError && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={refreshBalances}
+                className="h-6 w-6 p-0"
+                title="Retry fetching balances"
+              >
+                <RefreshCw className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
+        {balanceError && (
+          <div className="flex items-center gap-2 p-2 mb-3 bg-orange-50 border border-orange-200 rounded-md">
+            <AlertCircle className="h-4 w-4 text-orange-500" />
+            <span className="text-xs text-orange-700">
+              Failed to load balances. Showing cached data.
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between py-2">
           <div className="text-sm text-muted-foreground">Total (INR)</div>
-          <div className="text-lg font-semibold">{formatInr(totalInr)}</div>
+          <div className="text-lg font-semibold">
+            {isLoadingBalances && totalInr === 0 ? (
+              <div className="h-6 w-20 bg-gray-200 animate-pulse rounded" />
+            ) : (
+              formatInr(totalInr)
+            )}
+          </div>
         </div>
         <div className="divide-y">
           {rows.map((r) => (
@@ -43,9 +77,19 @@ export function BalancesCard({ prices }: { prices: Prices }) {
               </div>
               <div className="text-right">
                 <div className="text-sm font-medium">
-                  {r.amt} {r.sym}
+                  {isLoadingBalances && r.amt === 0 ? (
+                    <div className="h-4 w-16 bg-gray-200 animate-pulse rounded" />
+                  ) : (
+                    `${r.amt.toFixed(6)} ${r.sym}`
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground">{formatInr(r.amt * r.price)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {isLoadingBalances && r.amt === 0 ? (
+                    <div className="h-3 w-12 bg-gray-200 animate-pulse rounded" />
+                  ) : (
+                    formatInr(r.amt * r.price)
+                  )}
+                </div>
               </div>
             </div>
           ))}

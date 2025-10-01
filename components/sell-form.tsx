@@ -314,14 +314,14 @@ export function SellForm() {
       {methodType === "UPI" && (
         <div className="space-y-1.5">
           <Label htmlFor="upi">UPI ID</Label>
-          <Input id="upi" placeholder="name@bank" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
+          <Input id="upi" placeholder="name@upi" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
           {!upiValid && <p className="text-xs text-destructive">Enter a valid UPI ID</p>}
         </div>
       )}
 
       {(methodType === "PhonePe" || methodType === "PayTM" || methodType === "GPay") && (
         <div className="space-y-1.5">
-          <Label htmlFor="phone">Mobile Number</Label>
+          <Label htmlFor="phone">{methodType} Number</Label>
           <div className="flex items-center gap-2">
             <span className="px-2 py-2 border rounded-md text-sm select-none">+91</span>
             <Input
@@ -354,7 +354,7 @@ export function SellForm() {
             <Input
               id="acct"
               inputMode="numeric"
-              placeholder="###########"
+              placeholder="1234567890"
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 18))}
             />
@@ -379,7 +379,7 @@ export function SellForm() {
         <Input
           id="aadhaar"
           inputMode="numeric"
-          placeholder="XXXX XXXX XXXX"
+          placeholder="1011 1213 1415"
           value={aadhaar}
           onChange={(e) => setAadhaar(formatAadhaarInput(e.target.value))}
           maxLength={14}

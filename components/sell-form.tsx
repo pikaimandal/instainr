@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +32,13 @@ export function SellForm() {
   const [aadhaar, setAadhaar] = useState("")
 
   const { addTransaction, nextTxId } = useTransactions()
+
+  // Ensure ETH is never selected
+  useEffect(() => {
+    if (token === "ETH") {
+      setToken("WLD")
+    }
+  }, [token])
 
   const pricePerUnit =
     token === "WLD" ? (prices?.WLD ?? 0) : token === "ETH" ? (prices?.ETH ?? 0) : (prices?.["USDC.e"] ?? 0)
@@ -66,7 +73,8 @@ export function SellForm() {
     ifscValid &&
     accountValid &&
     bankNameValid &&
-    aadhaarValid
+    aadhaarValid &&
+    token !== "ETH"
 
   function formatAadhaarInput(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 12)
@@ -137,10 +145,13 @@ export function SellForm() {
             type="button"
             key={sym}
             onClick={() => setToken(sym)}
+            disabled={sym === "ETH"}
             className={
               token === sym
                 ? "rounded-md px-3 py-2 text-sm border bg-primary text-primary-foreground"
-                : "rounded-md px-3 py-2 text-sm border"
+                : sym === "ETH"
+                  ? "rounded-md px-3 py-2 text-sm border bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                  : "rounded-md px-3 py-2 text-sm border"
             }
             aria-pressed={token === sym}
           >
@@ -148,6 +159,15 @@ export function SellForm() {
           </button>
         ))}
       </div>
+      
+      {/* ETH restriction message */}
+      {token === "ETH" && (
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+          <p className="text-sm text-destructive font-medium">
+            Currently, you can't sell ETH for INR
+          </p>
+        </div>
+      )}
 
       {/* Amount */}
       <div className="space-y-1.5">

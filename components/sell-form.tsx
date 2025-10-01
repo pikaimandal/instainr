@@ -9,6 +9,7 @@ import { useWallet } from "@/hooks/use-wallet"
 import { usePrices } from "@/hooks/use-prices"
 import { useTransactions } from "@/hooks/use-transactions"
 import { formatInr } from "@/lib/format"
+import { MiniKit, MiniAppPaymentSuccessPayload, ResponseEvent } from "@worldcoin/minikit-js"
 
 type Token = "WLD" | "ETH" | "USDC.e"
 type Method =
@@ -30,6 +31,7 @@ export function SellForm() {
   const [accountNumber, setAccountNumber] = useState("")
   const [ifsc, setIfsc] = useState("")
   const [aadhaar, setAadhaar] = useState("")
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
   const { addTransaction, nextTxId } = useTransactions()
 
@@ -68,13 +70,15 @@ export function SellForm() {
     connected &&
     amountValid &&
     meetsMin &&
+    withinBalance &&
     upiValid &&
     phoneValid &&
     ifscValid &&
     accountValid &&
     bankNameValid &&
     aadhaarValid &&
-    token !== "ETH"
+    token !== "ETH" &&
+    !isProcessingPayment
 
   function formatAadhaarInput(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 12)
@@ -99,43 +103,132 @@ export function SellForm() {
     }
   }
 
+  const handlePayment = async () => {
+    if (!canSubmit || isProcessingPayment) return
+    
+    setIsProcessingPayment(true)
+    
+    try {
+      const method: Method =
+        methodType === "UPI"
+          ? { type: "UPI", upiId: upiId.trim() }
+          : methodType === "Bank"
+            ? {
+                type: "Bank",
+                bankName: bankName.trim(),
+                accountNumber,
+                ifsc: ifsc.toUpperCase(),
+              }
+            : { type: methodType, phone: phoneCombined }
+
+      // Step 1: Initiate payment on backend
+      const initiateResponse = await fetch('/api/initiate-pay', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          amount,
+          methodSummary: methodSummary(method)
+        }),
+      })
+
+      if (!initiateResponse.ok) {
+        const error = await initiateResponse.json()
+        throw new Error(error.error || 'Failed to initiate payment')
+      }
+
+      const paymentData = await initiateResponse.json()
+
+      // Step 2: Set up payment response listener
+      const handlePaymentResponse = async (payload: MiniAppPaymentSuccessPayload) => {
+        try {
+          // Step 3: Verify payment on backend
+          const confirmResponse = await fetch('/api/confirm-payment', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              payload: payload
+            }),
+          })
+
+          const confirmResult = await confirmResponse.json()
+
+          if (confirmResult.success) {
+            // Payment successful - add to transaction history
+            const id = nextTxId()
+            addTransaction({
+              id,
+              token,
+              amountToken: Number(amount),
+              inrPerUnit: pricePerUnit,
+              inrGross: Math.round(grossInr),
+              commissionInr,
+              inrNet: Math.round(netInr),
+              status: "Completed",
+              methodSummary: methodSummary(method),
+              createdAt: new Date().toISOString(),
+              explorerUrl: confirmResult.explorerUrl,
+            })
+            
+            // Deduct balance locally
+            deductBalance(token, Number(amount))
+            
+            // Reset form
+            setAmount("")
+            setUpiId("")
+            setPhoneDigits("")
+            setBankName("")
+            setAccountNumber("")
+            setIfsc("")
+            setAadhaar("")
+            
+          } else {
+            throw new Error(confirmResult.error || 'Payment verification failed')
+          }
+        } catch (error) {
+          console.error('Payment confirmation error:', error)
+          alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        } finally {
+          setIsProcessingPayment(false)
+        }
+      }
+
+      // Set up event listeners
+      MiniKit.subscribe(ResponseEvent.MiniAppPayment, (payload: any) => {
+        if (payload.status === 'success') {
+          handlePaymentResponse(payload as MiniAppPaymentSuccessPayload)
+        } else {
+          console.error('Payment error:', payload)
+          alert(`Payment failed: ${payload.message || 'Unknown error'}`)
+          setIsProcessingPayment(false)
+        }
+      })
+
+      // Send MiniKit Pay command
+      MiniKit.commands.pay({
+        reference: paymentData.referenceId,
+        to: paymentData.to,
+        tokens: paymentData.tokens,
+        description: `Sell ${amount} ${token} for INR`
+      })
+
+    } catch (error) {
+      console.error('Payment initiation error:', error)
+      alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setIsProcessingPayment(false)
+    }
+  }
+
   return (
     <form
       className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault()
-        if (!canSubmit) return
-        const method: Method =
-          methodType === "UPI"
-            ? { type: "UPI", upiId: upiId.trim() }
-            : methodType === "Bank"
-              ? {
-                  type: "Bank",
-                  bankName: bankName.trim(),
-                  accountNumber,
-                  ifsc: ifsc.toUpperCase(),
-                }
-              : { type: methodType, phone: phoneCombined }
-
-        const id = nextTxId()
-        addTransaction({
-          id,
-          token,
-          amountToken: Number(amount),
-          inrPerUnit: pricePerUnit,
-          inrGross: Math.round(grossInr),
-          commissionInr,
-          inrNet: Math.round(netInr),
-          status: "Processing",
-          methodSummary: methodSummary(method),
-          createdAt: new Date().toISOString(),
-          explorerUrl: undefined, // will attach after network confirmation
-        })
-        // Deduct balance locally
-        deductBalance(token, Number(amount))
-        // Reset form
-        setAmount("")
-        // Optionally: you could route to /history
+        handlePayment()
       }}
     >
       {/* Token selector */}
@@ -320,7 +413,7 @@ export function SellForm() {
       {!meetsMin && amountNum > 0 && <p className="text-xs text-destructive">Minimum conversion is ₹500</p>}
 
       <Button type="submit" className="w-full" disabled={!canSubmit}>
-        Confirm Sell
+        {isProcessingPayment ? "Processing Payment..." : "Confirm Sell"}
       </Button>
     </form>
   )

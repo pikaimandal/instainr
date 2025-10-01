@@ -62,14 +62,20 @@ export function useWallet() {
   // Function to fetch real token balances
   async function fetchBalances() {
     if (!walletState.connected || !MiniKit.isInstalled()) {
+      console.log('Skipping balance fetch: not connected or MiniKit not installed')
       return
     }
 
     try {
       const walletAddress = (MiniKit as any).walletAddress
+      console.log('Fetching balances for wallet address:', walletAddress)
       
-      if (!walletAddress || !isValidAddress(walletAddress)) {
-        throw new Error('Invalid wallet address')
+      if (!walletAddress) {
+        throw new Error('No wallet address available from MiniKit')
+      }
+      
+      if (!isValidAddress(walletAddress)) {
+        throw new Error(`Invalid wallet address format: ${walletAddress}`)
       }
 
       setWalletState(prev => ({
@@ -79,6 +85,7 @@ export function useWallet() {
       }))
 
       const balanceStrings = await fetchAllTokenBalances(walletAddress)
+      console.log('Received balance strings:', balanceStrings)
       
       // Convert string balances to numbers
       const balances: Balances = {
@@ -86,6 +93,8 @@ export function useWallet() {
         ETH: parseFloat(balanceStrings.ETH),
         "USDC.e": parseFloat(balanceStrings["USDC.e"]),
       }
+
+      console.log('Converted balances to numbers:', balances)
 
       setWalletState(prev => ({
         ...prev,
@@ -95,10 +104,13 @@ export function useWallet() {
       }))
     } catch (error) {
       console.error('Error fetching balances:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch balances'
+      console.error('Balance fetch error details:', errorMessage)
+      
       setWalletState(prev => ({
         ...prev,
         isLoadingBalances: false,
-        balanceError: error instanceof Error ? error.message : 'Failed to fetch balances',
+        balanceError: errorMessage,
       }))
     }
   }

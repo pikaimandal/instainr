@@ -1,9 +1,9 @@
 import { formatUnits } from 'viem'
 
-// World Chain Mainnet configuration
+// World Chain Mainnet configuration with Alchemy
 export const WORLD_CHAIN_CONFIG = {
   chainId: 480,
-  rpcUrl: 'https://worldchain-mainnet.g.alchemy.com/public',
+  alchemyUrl: `https://worldchain-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
   name: 'World Chain',
 }
 
@@ -21,30 +21,17 @@ export const TOKEN_DECIMALS = {
   ETH: 18,
 } as const
 
-// ERC20 balance function signature
-const BALANCE_OF_SIGNATURE = '0x70a08231'
-
 /**
- * Creates the data payload for ERC20 balanceOf call
- * @param address - The wallet address to check balance for
- * @returns The encoded function call data
- */
-function createBalanceOfData(address: string): string {
-  // Remove 0x prefix and pad to 32 bytes (64 hex characters)
-  const paddedAddress = address.slice(2).padStart(64, '0')
-  return BALANCE_OF_SIGNATURE + paddedAddress
-}
-
-/**
- * Makes an RPC call to the World Chain network
+ * Makes an RPC call to Alchemy's World Chain endpoint
  * @param method - The RPC method to call
  * @param params - The parameters for the RPC call
  * @returns The response from the RPC call
  */
-async function makeRpcCall(method: string, params: any[]): Promise<any> {
-  const response = await fetch(WORLD_CHAIN_CONFIG.rpcUrl, {
+async function makeAlchemyCall(method: string, params: any[]): Promise<any> {
+  const response = await fetch(WORLD_CHAIN_CONFIG.alchemyUrl, {
     method: 'POST',
     headers: {
+      'Accept': 'application/json',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -56,80 +43,87 @@ async function makeRpcCall(method: string, params: any[]): Promise<any> {
   })
 
   if (!response.ok) {
-    throw new Error(`RPC call failed: ${response.statusText}`)
+    throw new Error(`Alchemy API call failed: ${response.status} ${response.statusText}`)
   }
 
   const data = await response.json()
   
   if (data.error) {
-    throw new Error(`RPC error: ${data.error.message}`)
+    throw new Error(`Alchemy API error: ${data.error.message} (${data.error.code})`)
   }
 
   return data.result
 }
 
 /**
- * Fetches the balance of a specific token for a wallet address
+ * Fetches native ETH balance for a wallet address
  * @param walletAddress - The wallet address to check
- * @param tokenSymbol - The token symbol (WLD, USDC.e, or ETH)
- * @returns The formatted balance as a string
+ * @returns The formatted ETH balance as a string
  */
-export async function fetchTokenBalance(
-  walletAddress: string,
-  tokenSymbol: keyof typeof TOKEN_CONTRACTS
-): Promise<string> {
+async function fetchNativeETHBalance(walletAddress: string): Promise<string> {
   try {
-    let balance: string
-
-    if (tokenSymbol === 'ETH') {
-      // For ETH, we need to get both native ETH and WETH balances
-      // First get native ETH balance
-      const nativeBalance = await makeRpcCall('eth_getBalance', [walletAddress, 'latest'])
-      
-      // Then get WETH balance
-      const wethData = createBalanceOfData(walletAddress)
-      const wethBalance = await makeRpcCall('eth_call', [
-        {
-          to: TOKEN_CONTRACTS.ETH,
-          data: wethData,
-        },
-        'latest',
-      ])
-
-      // Convert both to decimal and add them
-      const nativeAmount = BigInt(nativeBalance)
-      const wethAmount = BigInt(wethBalance)
-      const totalAmount = nativeAmount + wethAmount
-      
-      balance = totalAmount.toString()
-    } else {
-      // For ERC20 tokens, use balanceOf
-      const contractAddress = TOKEN_CONTRACTS[tokenSymbol]
-      const data = createBalanceOfData(walletAddress)
-      
-      balance = await makeRpcCall('eth_call', [
-        {
-          to: contractAddress,
-          data,
-        },
-        'latest',
-      ])
-    }
-
-    // Format the balance using the token's decimals
-    const decimals = TOKEN_DECIMALS[tokenSymbol]
-    const formattedBalance = formatUnits(BigInt(balance), decimals)
-    
-    // Return with reasonable precision (max 6 decimal places)
+    const balance = await makeAlchemyCall('eth_getBalance', [walletAddress, 'latest'])
+    const formattedBalance = formatUnits(BigInt(balance), 18)
     return parseFloat(formattedBalance).toFixed(6)
   } catch (error) {
-    console.error(`Error fetching ${tokenSymbol} balance:`, error)
+    console.error('Error fetching native ETH balance:', error)
     return '0.000000'
   }
 }
 
 /**
- * Fetches all token balances for a wallet address
+ * Fetches ERC20 token balances using Alchemy's optimized method
+ * @param walletAddress - The wallet address to check
+ * @returns Object containing token balances
+ */
+async function fetchERC20Balances(walletAddress: string): Promise<{
+  WLD: string
+  'USDC.e': string
+}> {
+  try {
+    // Use Alchemy's alchemy_getTokenBalances method for better performance
+    const tokenBalances = await makeAlchemyCall('alchemy_getTokenBalances', [
+      walletAddress,
+      'erc20'
+    ])
+
+    console.log('Alchemy token balances response:', tokenBalances)
+
+    const balances = {
+      WLD: '0.000000',
+      'USDC.e': '0.000000',
+    }
+
+    if (tokenBalances && tokenBalances.tokenBalances) {
+      for (const token of tokenBalances.tokenBalances) {
+        const contractAddress = token.contractAddress?.toLowerCase()
+        
+        if (contractAddress === TOKEN_CONTRACTS.WLD.toLowerCase()) {
+          if (token.tokenBalance && token.tokenBalance !== '0x0') {
+            const balance = formatUnits(BigInt(token.tokenBalance), TOKEN_DECIMALS.WLD)
+            balances.WLD = parseFloat(balance).toFixed(6)
+          }
+        } else if (contractAddress === TOKEN_CONTRACTS['USDC.e'].toLowerCase()) {
+          if (token.tokenBalance && token.tokenBalance !== '0x0') {
+            const balance = formatUnits(BigInt(token.tokenBalance), TOKEN_DECIMALS['USDC.e'])
+            balances['USDC.e'] = parseFloat(balance).toFixed(6)
+          }
+        }
+      }
+    }
+
+    return balances
+  } catch (error) {
+    console.error('Error fetching ERC20 balances:', error)
+    return {
+      WLD: '0.000000',
+      'USDC.e': '0.000000',
+    }
+  }
+}
+
+/**
+ * Fetches all token balances for a wallet address using Alchemy's optimized APIs
  * @param walletAddress - The wallet address to check
  * @returns Object containing all token balances
  */
@@ -139,25 +133,25 @@ export async function fetchAllTokenBalances(walletAddress: string): Promise<{
   ETH: string
 }> {
   try {
-    // Fetch all balances in parallel for better performance
-    const [wldBalance, usdcBalance, ethBalance] = await Promise.all([
-      fetchTokenBalance(walletAddress, 'WLD'),
-      fetchTokenBalance(walletAddress, 'USDC.e'),
-      fetchTokenBalance(walletAddress, 'ETH'),
+    console.log(`Fetching balances for wallet: ${walletAddress}`)
+    
+    // Fetch native ETH and ERC20 tokens in parallel
+    const [ethBalance, erc20Balances] = await Promise.all([
+      fetchNativeETHBalance(walletAddress),
+      fetchERC20Balances(walletAddress),
     ])
 
-    return {
-      WLD: wldBalance,
-      'USDC.e': usdcBalance,
+    const result = {
+      WLD: erc20Balances.WLD,
+      'USDC.e': erc20Balances['USDC.e'],
       ETH: ethBalance,
     }
+
+    console.log('Final balance result:', result)
+    return result
   } catch (error) {
-    console.error('Error fetching token balances:', error)
-    return {
-      WLD: '0.000000',
-      'USDC.e': '0.000000',
-      ETH: '0.000000',
-    }
+    console.error('Error fetching all token balances:', error)
+    throw error // Re-throw to let the hook handle the error properly
   }
 }
 

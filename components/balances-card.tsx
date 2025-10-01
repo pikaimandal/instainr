@@ -15,7 +15,7 @@ type Prices =
   | undefined
 
 export function BalancesCard({ prices }: { prices: Prices }) {
-  const { balances, isLoadingBalances, balanceError, refreshBalances } = useWallet()
+  const { balances, isLoadingBalances, balanceError, refreshBalances, walletAddress } = useWallet()
   const rows = [
     { sym: "WLD", amt: balances.WLD, price: prices?.WLD ?? 0 },
     { sym: "ETH", amt: balances.ETH, price: prices?.ETH ?? 0 },
@@ -53,6 +53,14 @@ export function BalancesCard({ prices }: { prices: Prices }) {
             <AlertCircle className="h-4 w-4 text-orange-500" />
             <span className="text-xs text-orange-700">
               Failed to load balances. Showing cached data.
+            </span>
+          </div>
+        )}
+        {/* Temporary debug display */}
+        {walletAddress && (
+          <div className="flex items-center gap-2 p-2 mb-3 bg-blue-50 border border-blue-200 rounded-md">
+            <span className="text-xs text-blue-700">
+              Wallet: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
             </span>
           </div>
         )}

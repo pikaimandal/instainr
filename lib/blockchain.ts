@@ -181,6 +181,8 @@ export async function fetchAllTokenBalances(walletAddress: string): Promise<{
   'USDC.e': string
   ETH: string
 }> {
+  // Debug log for checking what address is being used
+  console.log('🔍 BLOCKCHAIN DEBUG: Fetching for address:', walletAddress)
   
   try {
     const [ethBalance, erc20Balances] = await Promise.all([
@@ -194,9 +196,10 @@ export async function fetchAllTokenBalances(walletAddress: string): Promise<{
       ETH: ethBalance,
     }
 
+    console.log('🔍 BLOCKCHAIN DEBUG: Result for', walletAddress, ':', result)
     return result
   } catch (error) {
-    console.error('❌ Balance fetch failed:', error)
+    console.error('❌ Balance fetch failed for', walletAddress, ':', error)
     throw error
   }
 }

@@ -58,7 +58,11 @@ export default function HistoryPage() {
                     <span>
                       {t.token} • {t.amountToken} {t.token}
                     </span>
-                    <span className="text-sm font-medium">{t.status}</span>
+                    <span className={`text-sm font-medium ${
+                      t.status === "Processing" ? "text-yellow-500" :
+                      t.status === "Completed" ? "text-green-500" :
+                      t.status === "Rejected" ? "text-red-500" : ""
+                    }`}>{t.status}</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     {formatInr(t.inrNet)} • {t.methodSummary}
@@ -139,7 +143,7 @@ export default function HistoryPage() {
                       {t.status === "Rejected" && t.rejectReason && (
                         <div>
                           <span className="text-muted-foreground">Reason: </span>
-                          <span className="text-destructive">{t.rejectReason}</span>
+                          <span className="text-red-500">{t.rejectReason}</span>
                         </div>
                       )}
                     </div>

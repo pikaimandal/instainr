@@ -268,8 +268,8 @@ export function SellForm() {
       
       {/* ETH restriction message */}
       {token === "ETH" && (
-        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-          <p className="text-sm text-destructive font-medium">
+        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+          <p className="text-sm text-red-500 font-medium">
             Currently, you can't sell ETH for INR
           </p>
         </div>
@@ -298,7 +298,7 @@ export function SellForm() {
             Max
           </button>
         </div>
-        {!withinBalance && <p className="text-xs text-destructive">Exceeds available balance</p>}
+        {!withinBalance && <p className="text-xs text-red-500">Exceeds available balance</p>}
       </div>
 
       {/* Payout method */}
@@ -327,7 +327,7 @@ export function SellForm() {
         <div className="space-y-1.5">
           <Label htmlFor="upi">UPI ID</Label>
           <Input id="upi" placeholder="name@upi" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
-          {!upiValid && <p className="text-xs text-destructive">Enter a valid UPI ID</p>}
+          {!upiValid && <p className="text-xs text-red-500">Enter a valid UPI ID</p>}
         </div>
       )}
 
@@ -346,7 +346,7 @@ export function SellForm() {
               maxLength={10}
             />
           </div>
-          {!phoneValid && <p className="text-xs text-destructive">Enter a valid 10-digit number</p>}
+          {!phoneValid && <p className="text-xs text-red-500">Enter a valid 10-digit number</p>}
         </div>
       )}
 
@@ -380,7 +380,7 @@ export function SellForm() {
               onChange={(e) => setIfsc(e.target.value.toUpperCase())}
               maxLength={11}
             />
-            {!ifscValid && <p className="text-xs text-destructive">Enter a valid IFSC</p>}
+            {!ifscValid && <p className="text-xs text-red-500">Enter a valid IFSC</p>}
           </div>
         </div>
       )}
@@ -416,7 +416,7 @@ export function SellForm() {
               onChange={(e) => setAadhaar(formatAadhaarInput(e.target.value))}
               maxLength={14}
             />
-            {!aadhaarValid && aadhaar.length > 0 && <p className="text-xs text-destructive">Format: XXXX XXXX XXXX</p>}
+            {!aadhaarValid && aadhaar.length > 0 && <p className="text-xs text-red-500">Format: XXXX XXXX XXXX</p>}
           </div>
         )}
         
@@ -429,12 +429,12 @@ export function SellForm() {
               onChange={(e) => setPan(formatPanInput(e.target.value))}
               maxLength={10}
             />
-            {!panValid && pan.length > 0 && <p className="text-xs text-destructive">Format: ABCDE1234F</p>}
+            {!panValid && pan.length > 0 && <p className="text-xs text-red-500">Format: ABCDE1234F</p>}
           </div>
         )}
         
         {!kycValid && (aadhaar.length > 0 || pan.length > 0) && (
-          <p className="text-xs text-destructive">Please provide a valid AADHAAR or PAN number</p>
+          <p className="text-xs text-red-500">Please provide a valid AADHAAR or PAN number</p>
         )}
       </div>
 
@@ -462,7 +462,7 @@ export function SellForm() {
         </CardContent>
       </Card>
 
-      {!meetsMin && amountNum > 0 && <p className="text-xs text-destructive">Minimum conversion is ₹500</p>}
+      {!meetsMin && amountNum > 0 && <p className="text-xs text-red-500">Minimum conversion is ₹500</p>}
 
       <Button type="submit" className="w-full" disabled={!canSubmit}>
         {isProcessingPayment ? "Processing Payment..." : "Confirm Sell"}

@@ -55,7 +55,7 @@ export default function SplashScreen({ onSuccess }: SplashScreenProps) {
             {isConnecting ? "Connecting..." : "Connect Wallet"}
           </Button>
           {error && (
-            <p className="text-xs text-destructive text-center max-w-sm">
+            <p className="text-xs text-red-500 text-center max-w-sm">
               {error}
             </p>
           )}

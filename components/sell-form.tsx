@@ -31,6 +31,8 @@ export function SellForm() {
   const [accountNumber, setAccountNumber] = useState("")
   const [ifsc, setIfsc] = useState("")
   const [aadhaar, setAadhaar] = useState("")
+  const [pan, setPan] = useState("")
+  const [kycType, setKycType] = useState<"AADHAAR" | "PAN">("AADHAAR")
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
   const { addTransaction, nextTxId } = useTransactions()
@@ -65,6 +67,10 @@ export function SellForm() {
   const bankNameValid = methodType !== "Bank" || bankName.trim().length >= 2
 
   const aadhaarValid = /^\d{4}\s\d{4}\s\d{4}$/.test(aadhaar)
+  const panValid = /^[A-Z]{5}\d{4}[A-Z]$/.test(pan)
+  
+  // At least one KYC document must be valid
+  const kycValid = (aadhaar.length > 0 && aadhaarValid) || (pan.length > 0 && panValid)
 
   const canSubmit =
     connected &&
@@ -76,13 +82,19 @@ export function SellForm() {
     ifscValid &&
     accountValid &&
     bankNameValid &&
-    aadhaarValid &&
+    kycValid &&
     token !== "ETH" &&
     !isProcessingPayment
 
   function formatAadhaarInput(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 12)
     return digits.replace(/(\d{4})(\d{0,4})(\d{0,4})/, (_, a, b, c) => [a, b, c].filter(Boolean).join(" "))
+  }
+
+  function formatPanInput(value: string) {
+    // Remove any non-alphanumeric characters and convert to uppercase
+    const clean = value.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 10)
+    return clean
   }
 
   function onPhoneChangeDigits(v: string) {
@@ -373,18 +385,57 @@ export function SellForm() {
         </div>
       )}
 
-      {/* Aadhaar */}
+      {/* KYC: AADHAAR or PAN */}
       <div className="space-y-1.5">
-        <Label htmlFor="aadhaar">Aadhaar (KYC)</Label>
-        <Input
-          id="aadhaar"
-          inputMode="numeric"
-          placeholder="1011 1213 1415"
-          value={aadhaar}
-          onChange={(e) => setAadhaar(formatAadhaarInput(e.target.value))}
-          maxLength={14}
-        />
-        {!aadhaarValid && aadhaar.length > 0 && <p className="text-xs text-destructive">Format: XXXX XXXX XXXX</p>}
+        <Label>KYC: AADHAAR or PAN</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {(["AADHAAR", "PAN"] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setKycType(type)}
+              className={
+                kycType === type
+                  ? "rounded-md px-3 py-2 text-sm border bg-primary text-primary-foreground"
+                  : "rounded-md px-3 py-2 text-sm border"
+              }
+              aria-pressed={kycType === type}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+        
+        {kycType === "AADHAAR" && (
+          <div className="space-y-1.5">
+            <Input
+              id="aadhaar"
+              inputMode="numeric"
+              placeholder="1011 1213 1415"
+              value={aadhaar}
+              onChange={(e) => setAadhaar(formatAadhaarInput(e.target.value))}
+              maxLength={14}
+            />
+            {!aadhaarValid && aadhaar.length > 0 && <p className="text-xs text-destructive">Format: XXXX XXXX XXXX</p>}
+          </div>
+        )}
+        
+        {kycType === "PAN" && (
+          <div className="space-y-1.5">
+            <Input
+              id="pan"
+              placeholder="XXXXX1234X"
+              value={pan}
+              onChange={(e) => setPan(formatPanInput(e.target.value))}
+              maxLength={10}
+            />
+            {!panValid && pan.length > 0 && <p className="text-xs text-destructive">Format: ABCDE1234F</p>}
+          </div>
+        )}
+        
+        {!kycValid && (aadhaar.length > 0 || pan.length > 0) && (
+          <p className="text-xs text-destructive">Please provide a valid AADHAAR or PAN number</p>
+        )}
       </div>
 
       {/* Conversion info */}
